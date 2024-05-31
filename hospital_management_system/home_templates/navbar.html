@@ -42,7 +42,23 @@
             Diagnosis
         </a>
         <div class="dropdown-menu" aria-labelledby="navbarDropdownAppointments">
-          <a class="dropdown-item" href="{% url 'diagnosis_list' %}">List</a>
+          <a class="dropdown-item" href="{% url 'diagnosis_list' %}">Diagnosis List</a>
+          <a class="dropdown-item" href="{% url 'diagnosis_create' %}">New Diagnosis</a>
+        
+        <!-- Dropdown menu for appointments -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAppointments" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              Admissions
+          </a>
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdownAdmissions">
+            <a class="dropdown-item" href="{% url 'admission_list' %}">Admission List</a>
+            <a class="dropdown-item" href="{% url 'admission_create' %}">New Admission</a>
+            <a class="dropdown-item" href="{% url 'discharge_list' %}">Discharge List</a>
+             <!-- Add other admission-related links here -->
+        </div>
+    </li>
+      
           
       
 

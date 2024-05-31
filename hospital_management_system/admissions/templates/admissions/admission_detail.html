@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient List</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+</head>
+<body>
+    {% include 'navbar.html' %}
+    {% block content %}
+  <h2>{{ admission }}</h2>
+  <p>Patient: {{ admission.patient }}</p>
+  <p>Doctor: {{ admission.doctor }}</p>
+  <p>Admission Date: {{ admission.admission_date }}</p>
+  <p>Discharge Date: {{ admission.discharge_date }}</p>
+  <p>Status: {{ admission.status }}</p>
+  <p>Discharge Summary: {{ admission.discharge_summary }}</p>
+  <a href="{% url 'admission_update' admission.pk %}">Edit</a>
+  <form action="{% url 'admission_delete' admission.pk %}" method="post" style="display:inline;">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+  </form>
+  <a href="{% url 'admission_list' %}">Back to Admission List</a>
+  {% if admission.status != 'discharged' %}
+    <a href="{% url 'discharge_patient' admission.pk %}" class="btn btn-warning">Discharge Patient</a>
+  {% endif %}
+{% endblock %}
+<!-- Include Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
+
