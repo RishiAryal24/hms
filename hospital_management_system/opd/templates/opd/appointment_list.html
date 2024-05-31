@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointment List</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+</head>
+<body>
+    {% include 'navbar.html' %}
+    <h1>Appointment List</h1>
+    <ul>
+        {% for appointment in appointments %}
+            <li>
+                <a href="{% url 'appointment_detail' appointment.appointment_id %}">
+                    Appointment with Dr. {{ appointment.doctor.last_name }} on {{ appointment.appointment_date }} at {{ appointment.appointment_time }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    <a href="{% url 'appointment_create' %}">Create New Appointment</a>
+    {% include 'bootstrap.html' %}
+</body>
+</html>

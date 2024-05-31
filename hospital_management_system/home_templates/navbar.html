@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- Navbar -->
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <a class="navbar-brand" href="#">Hospital Management System</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+  
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav mr-auto">
+        <li class="nav-item active">
+          <a class="nav-link" href="/">Home</a>
+        </li>
+        <!-- Patients dropdown menu -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Patients
+          </a>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <a class="dropdown-item" href="{% url 'patient_register' %}">Patient Registration</a>
+            <a class="dropdown-item" href="{% url 'patient_list' %}">Patient List</a>
+            <!-- Add more dropdown items here as needed -->
+          </div>
+        </li>
+        <!-- Dropdown menu for appointments -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAppointments" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+              Appointments
+          </a>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdownAppointments">
+            <a class="dropdown-item" href="{% url 'appointment_create' %}">Create Appointment</a>  
+            <a class="dropdown-item" href="{% url 'appointment_list' %}">Appointment List</a>
+              
+            <!-- Add other appointment-related links here -->
+          </div>
+      </li>
+       <!-- Dropdown menu for diagnosis -->
+       <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownAppointments" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            Diagnosis
+        </a>
+        <div class="dropdown-menu" aria-labelledby="navbarDropdownAppointments">
+          <a class="dropdown-item" href="{% url 'diagnosis_list' %}">List</a>
+          
+      
+
+
+            
+          <!-- Add other appointment-related links here -->
+        </div>
+    </li>
+  
+        <!-- Add more navigation links here as needed -->
+        <!-- Example:
+        <li class="nav-item">
+          <a class="nav-link" href="/about/">About</a>
+        </li>
+        -->
+      </ul>
+    </div>
+  </nav>
+  

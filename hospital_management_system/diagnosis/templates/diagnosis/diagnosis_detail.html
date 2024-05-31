@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnosis</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+</head>
+<body>
+    {% include 'navbar.html' %}
+    <h2>{{ diagnosis }}</h2>
+  <p>Patient: {{ diagnosis.patient }}</p>
+  <p>Doctor: {{ diagnosis.doctor }}</p>
+  <p>Symptoms: {{ diagnosis.symptoms }}</p>
+  <p>Diagnosis: {{ diagnosis.diagnosis }}</p>
+  <p>Prescription: {{ diagnosis.prescription }}</p>
+  <p>Date: {{ diagnosis.date }}</p>
+  <a href="{% url 'diagnosis_update' diagnosis.pk %}">Edit</a>
+  <form action="{% url 'diagnosis_delete' diagnosis.pk %}" method="post">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+  </form>
+  <a href="{% url 'diagnosis_list' %}">Back to Diagnosis List</a>
+  {% include 'bootstrap.html' %}
+</body>
+</html>
+

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+    {% load static %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagonistic Form</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+</head>
+<body>
+  <div class="container">
+    {% include 'navbar.html' %}
+    
+  <h1>Diagonistic Form</h1>
+  <h2>{% if form.instance.pk %}Edit Diagnosis{% else %}New Diagnosis{% endif %}</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+  </form>
+  <a href="{% url 'diagnosis_list' %}">Back to Diagnosis List</a>
+  {% include 'bootstrap.html' %}
+  </div>
+</body>
+</html>
+

@@ -1,0 +1,63 @@
+/* styles.css */
+
+/* Global Styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px; /* Increase padding to add more space */
+}
+
+/* Navbar Styles */
+/*.navbar {
+    background-color: #333;
+    color: #fff;
+    padding: 10px 0;
+    position: fixed; /* Fixed position to keep the navbar always visible */
+   /* width: 100%; /* Full width */
+    /*top: 0; /* Stick to the top */
+    /*z-index: 1000; /* Ensure it's above other content */
+/*}
+
+.navbar a {
+    color: #fff;
+    text-decoration: none;
+    margin: 0 10px;
+    display: inline-block; /* Ensure the links are displayed inline */
+    /*outline: none; /* Remove outline on focus */
+/*}
+
+/* Image Container Styles */
+.image-container {
+    position: relative;
+    text-align: center;
+    margin-top: 10px; /* Adjust margin to accommodate the fixed navbar */
+}
+
+.hospital-logo {
+    max-width: 50%;
+    height: auto;
+}
+
+.overlay-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+}
+
+/* Button Styles */
+.btn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: #
