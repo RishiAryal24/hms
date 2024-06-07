@@ -13,3 +13,13 @@ class Patient(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+
+class Assignment(models.Model):
+    patient = models.ForeignKey('Patient', on_delete=models.CASCADE)
+    doctor = models.ForeignKey('opd.Doctor', on_delete=models.CASCADE)
+    title = models.CharField(max_length=200)
+    assignment_date = models.DateField()
+    # other fields...
+
+    def __str__(self):
+        return self.title
