@@ -5,6 +5,7 @@
 
 import os
 from pathlib import Path
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -28,7 +29,10 @@ SHARED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'django_filters',
+    'corsheaders',
 ]
 
 TENANT_APPS = [
@@ -36,6 +40,7 @@ TENANT_APPS = [
     'core',              # TimeStampedModel base
     'accounts',          # User, Role
     'patients',          # Patient module
+    'appointments',      # Appointments module
 ]
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
@@ -52,6 +57,7 @@ PUBLIC_SCHEMA_NAME  = 'public'
 # MIDDLEWARE
 # -----------------------
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django_tenants.middleware.main.TenantMainMiddleware',
 
     'django.middleware.security.SecurityMiddleware',
@@ -87,12 +93,27 @@ AUTH_USER_MODEL       = 'accounts.User'
 PUBLIC_SCHEMA_URLCONF = 'hms.urls_public'
 
 # -----------------------
+# JWT SETTINGS
+# -----------------------
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME':    timedelta(hours=8),
+    'REFRESH_TOKEN_LIFETIME':   timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS':    True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM':                'HS256',
+    'SIGNING_KEY':              SECRET_KEY,
+    'AUTH_HEADER_TYPES':        ('Bearer',),
+    'USER_ID_FIELD':            'id',
+    'USER_ID_CLAIM':            'user_id',
+}
+
+# -----------------------
 # REST FRAMEWORK
 # -----------------------
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -103,6 +124,12 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
 }
+
+# -----------------------
+# CORS
+# -----------------------
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
 
 # -----------------------
 # TEMPLATES
