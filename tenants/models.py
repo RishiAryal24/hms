@@ -1,3 +1,5 @@
+# tenants/models.py
+
 from django_tenants.models import TenantMixin, DomainMixin
 from django.db import models
 from django.contrib.auth.models import AbstractUser

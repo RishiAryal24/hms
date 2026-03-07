@@ -385,4 +385,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-> Built with Django, django-tenants, and PostgreSQL. Designed for healthcare providers who need scalable, isolated, and secure multi-hospital management.
+> Built with Django, django-tenants, and PostgreSQL. Designed for healthcare providers who need scalable, isolated, and secure multi-hospital management. All other features beyond login is yet to developed and is in continuous progress. 

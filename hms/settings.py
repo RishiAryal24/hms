@@ -1,3 +1,8 @@
+# ----------------------------------------------------------------------
+# LOCATION: HMS/hms/settings.py
+# ACTION:   REPLACE the entire contents of this file
+# ----------------------------------------------------------------------
+
 import os
 from pathlib import Path
 
@@ -13,8 +18,7 @@ ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.localhost']
 SHARED_APPS = [
     'django_tenants',
 
-    'tenants',
-    
+    'tenants',           # SuperAdmin, Client, Domain — public schema
 
     'django.contrib.contenttypes',
     'django.contrib.auth',
@@ -24,23 +28,25 @@ SHARED_APPS = [
     'django.contrib.staticfiles',
 
     'rest_framework',
+    'django_filters',
 ]
 
 TENANT_APPS = [
     'tenant_apps',
-    'accounts',
+    'core',              # TimeStampedModel base
+    'accounts',          # User, Role
+    'patients',          # Patient module
 ]
 
-# django-tenants requires this exact pattern — do NOT use SHARED_APPS + TENANT_APPS
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 # -----------------------
 # TENANT SETTINGS
 # -----------------------
-TENANT_MODEL = "tenants.Client"
+TENANT_MODEL        = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
-DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
-PUBLIC_SCHEMA_NAME = 'public'
+DATABASE_ROUTERS    = ('django_tenants.routers.TenantSyncRouter',)
+PUBLIC_SCHEMA_NAME  = 'public'
 
 # -----------------------
 # MIDDLEWARE
@@ -57,42 +63,59 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'hms.urls'
-WSGI_APPLICATION = 'hms.wsgi.application'
+ROOT_URLCONF      = 'hms.urls'
+WSGI_APPLICATION  = 'hms.wsgi.application'
 
 # -----------------------
 # DATABASE
 # -----------------------
 DATABASES = {
     'default': {
-        'ENGINE': 'django_tenants.postgresql_backend',
-        'NAME': 'hms_db',
-        'USER': 'postgres',
+        'ENGINE':   'django_tenants.postgresql_backend',
+        'NAME':     'hms_db',
+        'USER':     'postgres',
         'PASSWORD': '12345',
-        'HOST': 'localhost',
-        'PORT': '5432',
+        'HOST':     'localhost',
+        'PORT':     '5432',
     }
 }
 
 # -----------------------
 # AUTH
 # -----------------------
-# REPLACE WITH:
-AUTH_USER_MODEL = 'accounts.User'  # tenant users
-PUBLIC_SCHEMA_URLCONF = 'hms.urls_public'  # superadmin gets its own urls
+AUTH_USER_MODEL       = 'accounts.User'
+PUBLIC_SCHEMA_URLCONF = 'hms.urls_public'
 
 # -----------------------
-# TEMPLATES (Required for admin)
+# REST FRAMEWORK
+# -----------------------
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+}
+
+# -----------------------
+# TEMPLATES
 # -----------------------
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],  # optional folder for custom templates
-        'APP_DIRS': True,                   # must be True for admin templates
+        'DIRS':    [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
-                'django.template.context_processors.request',  # required by admin
+                'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
             ],
@@ -104,18 +127,20 @@ TEMPLATES = [
 # INTERNATIONALIZATION
 # -----------------------
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'Asia/Kathmandu'
-USE_I18N = True
-USE_TZ = True
+TIME_ZONE     = 'Asia/Kathmandu'
+USE_I18N      = True
+USE_TZ        = True
 
 # -----------------------
-# STATIC FILES
+# STATIC & MEDIA
 # -----------------------
-STATIC_URL = '/static/'
+STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+MEDIA_URL  = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # -----------------------
 # DEFAULT PRIMARY KEY
 # -----------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
