@@ -2,8 +2,11 @@
 
 import axios from "axios";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://butwalhospital.localhost:8000/api";
+
 const api = axios.create({
-  baseURL: "http://butwalhospital.localhost:8000/api",
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -24,7 +27,7 @@ api.interceptors.response.use(
       try {
         const refresh = localStorage.getItem("refresh");
         const { data } = await axios.post(
-          "http://butwalhospital.localhost:8000/api/auth/refresh/",
+          `${API_BASE_URL}/auth/refresh/`,
           { refresh }
         );
         localStorage.setItem("access", data.access);

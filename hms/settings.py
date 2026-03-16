@@ -6,12 +6,27 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-change-this'
-DEBUG = True
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.localhost']
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-this')
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1,.localhost,.onrender.com',
+    ).split(',')
+    if host.strip()
+]
+
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # -----------------------
 # APPS
@@ -61,6 +76,7 @@ MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
 
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -75,16 +91,27 @@ WSGI_APPLICATION  = 'hms.wsgi.application'
 # -----------------------
 # DATABASE
 # -----------------------
-DATABASES = {
-    'default': {
-        'ENGINE':   'django_tenants.postgresql_backend',
-        'NAME':     'hms_db',
-        'USER':     'postgres',
-        'PASSWORD': '12345',
-        'HOST':     'localhost',
-        'PORT':     '5432',
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            engine='django_tenants.postgresql_backend',
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE':   'django_tenants.postgresql_backend',
+            'NAME':     os.environ.get('DB_NAME', 'hms_db'),
+            'USER':     os.environ.get('DB_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', '12345'),
+            'HOST':     os.environ.get('DB_HOST', 'localhost'),
+            'PORT':     os.environ.get('DB_PORT', '5432'),
+        }
+    }
 
 # -----------------------
 # AUTH
@@ -128,8 +155,31 @@ REST_FRAMEWORK = {
 # -----------------------
 # CORS
 # -----------------------
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'CORS_ALLOWED_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173',
+    ).split(',')
+    if origin.strip()
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    regex.strip()
+    for regex in os.environ.get(
+        'CORS_ALLOWED_ORIGIN_REGEXES',
+        r'https://.*\.onrender\.com',
+    ).split(',')
+    if regex.strip()
+]
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'CSRF_TRUSTED_ORIGINS',
+        'http://localhost:5173,http://127.0.0.1:5173',
+    ).split(',')
+    if origin.strip()
+]
 
 # -----------------------
 # TEMPLATES
@@ -163,6 +213,14 @@ USE_TZ        = True
 # -----------------------
 STATIC_URL  = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 MEDIA_URL  = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
