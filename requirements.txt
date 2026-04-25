@@ -1,22 +1,19 @@
 Django==4.2.11
 
-# SaaS / Tenants
 django-tenants==3.5.0
 
-# REST API
 djangorestframework==3.16.1
 djangorestframework-simplejwt==5.5.1
-django-filter==25.2
+
+django-filter==24.3
+
 django-cors-headers==4.9.0
 
-# Database
 psycopg2-binary==2.9.9
 dj-database-url==3.0.1
 
-# Server
 gunicorn==25.3.0
 whitenoise==6.12.0
 
-# Utils
 Pillow==12.2.0
 sqlparse==0.5.5
