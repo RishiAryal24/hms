@@ -1,6 +1,6 @@
 Django==4.2.11
 django-tenants==3.5.0
-psycopg2-binary
+psycopg2-binary==2.9.9
 djangorestframework==3.16.1
 sqlparse==0.5.5
 gunicorn
