@@ -24,7 +24,7 @@ SHARED_APPS = [
     "django_tenants",
 
     "tenants",
-    "accounts",
+    
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
@@ -36,6 +36,8 @@ SHARED_APPS = [
     "rest_framework_simplejwt",
     "django_filters",
     "corsheaders",
+
+    "accounts",
 ]
 
 TENANT_APPS = [
