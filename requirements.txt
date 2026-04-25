@@ -9,3 +9,4 @@ djangorestframework-simplejwt
 django-filter
 django-cors-headers
 dj_database_url
+Pillow
