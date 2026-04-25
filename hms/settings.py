@@ -84,13 +84,12 @@ WSGI_APPLICATION = "hms.wsgi.application"
 # DATABASE (RENDER SAFE)
 # ------------------------
 DATABASES = {
-    "default": dj_database_url.config(
+    'default': dj_database_url.config(
         default=os.environ.get("DATABASE_URL"),
         conn_max_age=600,
-        ssl_require=True
+        engine='django_tenants.postgresql_backend'
     )
 }
-
 # ------------------------
 # AUTH
 # ------------------------
