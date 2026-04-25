@@ -11,14 +11,15 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --------------------------------------------------
-# SECURITY
+# SECURITY (PRODUCTION SAFE)
 # --------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-change-this")
-DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+DEBUG = False  # IMPORTANT for Render
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
-    "127.0.0.1,localhost"
+    "hms-7wwl.onrender.com,localhost,127.0.0.1"
 ).split(",")
 
 # --------------------------------------------------
@@ -56,7 +57,7 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 ]
 
 # --------------------------------------------------
-# TENANTS
+# TENANT CONFIG
 # --------------------------------------------------
 TENANT_MODEL = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
@@ -86,7 +87,7 @@ ROOT_URLCONF = 'hms.urls'
 WSGI_APPLICATION = 'hms.wsgi.application'
 
 # --------------------------------------------------
-# DATABASE (RENDER READY)
+# DATABASE (RENDER POSTGRES SUPPORT)
 # --------------------------------------------------
 DATABASES = {
     'default': dj_database_url.config(
@@ -96,12 +97,12 @@ DATABASES = {
 }
 
 # --------------------------------------------------
-# AUTH
+# AUTH USER MODEL
 # --------------------------------------------------
 AUTH_USER_MODEL = 'accounts.User'
 
 # --------------------------------------------------
-# JWT
+# JWT SETTINGS
 # --------------------------------------------------
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
@@ -167,15 +168,15 @@ USE_I18N = True
 USE_TZ = True
 
 # --------------------------------------------------
-# STATIC / MEDIA (RENDER READY)
+# STATIC FILES (FIX FOR YOUR ERROR)
 # --------------------------------------------------
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # --------------------------------------------------
 # DEFAULT AUTO FIELD
