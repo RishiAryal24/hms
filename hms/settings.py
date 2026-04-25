@@ -1,5 +1,5 @@
 # ----------------------------------------------------------------------
-# HMS/settings.py (PRODUCTION - RENDER READY FIXED)
+# HMS - PRODUCTION SAAS READY SETTINGS (STABLE VERSION)
 # ----------------------------------------------------------------------
 
 import os
@@ -9,9 +9,9 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # SECURITY
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-change-this")
 
 DEBUG = False
@@ -21,14 +21,18 @@ ALLOWED_HOSTS = os.environ.get(
     "hms-7wwl.onrender.com,localhost,127.0.0.1"
 ).split(",")
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # APPLICATIONS
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+
 SHARED_APPS = [
+    # django-tenants MUST be first
     'django_tenants',
 
+    # public schema app
     'tenants',
 
+    # Django core apps
     'django.contrib.contenttypes',
     'django.contrib.auth',
     'django.contrib.sessions',
@@ -36,6 +40,7 @@ SHARED_APPS = [
     'django.contrib.admin',
     'django.contrib.staticfiles',
 
+    # third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
@@ -51,30 +56,33 @@ TENANT_APPS = [
     'appointments',
 ]
 
-INSTALLED_APPS = list(SHARED_APPS) + [
+INSTALLED_APPS = SHARED_APPS + [
     app for app in TENANT_APPS if app not in SHARED_APPS
 ]
 
-# --------------------------------------------------
-# TENANT CONFIG
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+# TENANT CONFIGURATION (CRITICAL)
+# ----------------------------------------------------------------------
+
 TENANT_MODEL = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
 PUBLIC_SCHEMA_NAME = "public"
 PUBLIC_SCHEMA_URLCONF = "hms.urls_public"
 
 DATABASE_ROUTERS = [
-    'django_tenants.routers.TenantSyncRouter'
+    "django_tenants.routers.TenantSyncRouter"
 ]
 
-# --------------------------------------------------
-# MIDDLEWARE
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+# MIDDLEWARE (ORDER IS CRITICAL)
+# ----------------------------------------------------------------------
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
 
     'corsheaders.middleware.CorsMiddleware',
+
     'django_tenants.middleware.main.TenantMainMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -88,9 +96,10 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'hms.urls'
 WSGI_APPLICATION = 'hms.wsgi.application'
 
-# --------------------------------------------------
-# DATABASE (RENDER POSTGRES FIXED)
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+# DATABASE (RENDER SAFE + TENANT COMPATIBLE)
+# ----------------------------------------------------------------------
+
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if DATABASE_URL:
@@ -109,14 +118,16 @@ else:
         }
     }
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # AUTH
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+
 AUTH_USER_MODEL = 'accounts.User'
 
-# --------------------------------------------------
-# JWT SETTINGS
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+# JWT AUTH
+# ----------------------------------------------------------------------
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
@@ -129,9 +140,10 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # REST FRAMEWORK
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -147,15 +159,17 @@ REST_FRAMEWORK = {
     ],
 }
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # CORS
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # TEMPLATES
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -172,17 +186,19 @@ TEMPLATES = [
     },
 ]
 
-# --------------------------------------------------
+# ----------------------------------------------------------------------
 # INTERNATIONALIZATION
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Asia/Kathmandu'
 USE_I18N = True
 USE_TZ = True
 
-# --------------------------------------------------
-# STATIC FILES (RENDER FIX)
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+# STATIC FILES (RENDER FIXED)
+# ----------------------------------------------------------------------
+
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -191,7 +207,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-# --------------------------------------------------
-# DEFAULT PRIMARY KEY
-# --------------------------------------------------
+# ----------------------------------------------------------------------
+# DEFAULT AUTO FIELD
+# ----------------------------------------------------------------------
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
