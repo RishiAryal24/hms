@@ -24,7 +24,7 @@ SHARED_APPS = [
     "django_tenants",
 
     "tenants",
-
+    "accounts",
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
@@ -39,7 +39,7 @@ SHARED_APPS = [
 ]
 
 TENANT_APPS = [
-    "accounts",
+   
     "patients",
     "appointments",
     "core",
