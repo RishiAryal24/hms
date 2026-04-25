@@ -1,6 +1,5 @@
 # ----------------------------------------------------------------------
-# LOCATION: HMS/hms/settings.py
-# ACTION:   REPLACE the entire contents of this file
+# HMS/settings.py (PRODUCTION - RENDER READY FIXED)
 # ----------------------------------------------------------------------
 
 import os
@@ -11,11 +10,11 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --------------------------------------------------
-# SECURITY (PRODUCTION SAFE)
+# SECURITY
 # --------------------------------------------------
 SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-change-this")
 
-DEBUG = False  # IMPORTANT for Render
+DEBUG = False
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS",
@@ -61,9 +60,12 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 # --------------------------------------------------
 TENANT_MODEL = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
-DATABASE_ROUTERS = ('django_tenants.routers.TenantSyncRouter',)
-PUBLIC_SCHEMA_NAME = 'public'
-PUBLIC_SCHEMA_URLCONF = 'hms.urls_public'
+PUBLIC_SCHEMA_NAME = "public"
+PUBLIC_SCHEMA_URLCONF = "hms.urls_public"
+
+DATABASE_ROUTERS = [
+    'django_tenants.routers.TenantSyncRouter'
+]
 
 # --------------------------------------------------
 # MIDDLEWARE
@@ -87,17 +89,28 @@ ROOT_URLCONF = 'hms.urls'
 WSGI_APPLICATION = 'hms.wsgi.application'
 
 # --------------------------------------------------
-# DATABASE (RENDER POSTGRES SUPPORT)
+# DATABASE (RENDER POSTGRES FIXED)
 # --------------------------------------------------
-DATABASES = {
-    'default': dj_database_url.config(
-        default='sqlite:///db.sqlite3',
-        conn_max_age=600
-    )
-}
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=600,
+            ssl_require=True
+        )
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # --------------------------------------------------
-# AUTH USER MODEL
+# AUTH
 # --------------------------------------------------
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -168,7 +181,7 @@ USE_I18N = True
 USE_TZ = True
 
 # --------------------------------------------------
-# STATIC FILES (FIX FOR YOUR ERROR)
+# STATIC FILES (RENDER FIX)
 # --------------------------------------------------
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -179,6 +192,6 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # --------------------------------------------------
-# DEFAULT AUTO FIELD
+# DEFAULT PRIMARY KEY
 # --------------------------------------------------
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
