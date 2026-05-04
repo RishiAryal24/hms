@@ -10,13 +10,22 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         User = get_user_model()
 
-        username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
-        email = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@hms.com")
-        password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "Admin@12345")
+        username = os.getenv("DJANGO_SUPERUSER_USERNAME")
+        email = os.getenv("DJANGO_SUPERUSER_EMAIL")
+        password = os.getenv("DJANGO_SUPERUSER_PASSWORD")
 
-        # 👇 Ensure it runs in PUBLIC schema
+        # 🔴 Fail fast if env vars are missing
+        if not all([username, email, password]):
+            self.stdout.write(self.style.ERROR(
+                "❌ Missing environment variables for superuser creation"
+            ))
+            return
+
         with schema_context('public'):
-            if not User.objects.filter(username=username).exists():
+
+            user_exists = User.objects.filter(username=username).exists()
+
+            if not user_exists:
                 User.objects.create_superuser(
                     username=username,
                     email=email,
