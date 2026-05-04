@@ -12,10 +12,7 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "unsafe-dev-key-change-me")
 
 DEBUG = False
 
-ALLOWED_HOSTS = os.environ.get(
-    "ALLOWED_HOSTS",
-    "hms-7wwl.onrender.com,localhost,127.0.0.1"
-).split(",")
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "*").split(",")
 
 # ------------------------
 # APPS
@@ -24,7 +21,7 @@ SHARED_APPS = [
     "django_tenants",
 
     "tenants",
-    
+
     "django.contrib.contenttypes",
     "django.contrib.auth",
     "django.contrib.sessions",
@@ -41,7 +38,6 @@ SHARED_APPS = [
 ]
 
 TENANT_APPS = [
-   
     "patients",
     "appointments",
     "core",
@@ -54,6 +50,7 @@ INSTALLED_APPS = SHARED_APPS + TENANT_APPS
 # ------------------------
 TENANT_MODEL = "tenants.Client"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
+
 PUBLIC_SCHEMA_NAME = "public"
 PUBLIC_SCHEMA_URLCONF = "hms.urls_public"
 
@@ -62,14 +59,16 @@ DATABASE_ROUTERS = [
 ]
 
 # ------------------------
-# MIDDLEWARE (ORDER IS CRITICAL)
+# MIDDLEWARE (IMPORTANT ORDER)
 # ------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
 
+    # MUST be right after security middleware
+    "django_tenants.middleware.main.TenantMainMiddleware",
+
     "corsheaders.middleware.CorsMiddleware",
-    #"django_tenants.middleware.main.TenantMainMiddleware",
 
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -86,12 +85,12 @@ WSGI_APPLICATION = "hms.wsgi.application"
 # DATABASE (RENDER SAFE)
 # ------------------------
 DATABASES = {
-    'default': dj_database_url.config(
+    "default": dj_database_url.config(
         default=os.environ.get("DATABASE_URL"),
         conn_max_age=600,
-        engine='django_tenants.postgresql_backend'
     )
 }
+
 # ------------------------
 # AUTH
 # ------------------------
@@ -123,12 +122,18 @@ REST_FRAMEWORK = {
 }
 
 # ------------------------
-# STATIC FILES (FIX 500 ERROR)
+# CORS
+# ------------------------
+CORS_ALLOW_ALL_ORIGINS = True
+
+# ------------------------
+# STATIC FILES (RENDER SAFE)
 # ------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_MANIFEST_STRICT = False
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -151,4 +156,7 @@ TEMPLATES = [
     },
 ]
 
+# ------------------------
+# DEFAULT
+# ------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
