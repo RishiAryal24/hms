@@ -15,6 +15,7 @@ class Command(BaseCommand):
         email = os.environ.get("HMS_ADMIN_EMAIL", "admin@example.com")
         password = os.environ.get("HMS_ADMIN_PASSWORD")
         reset_password = os.environ.get("HMS_ADMIN_RESET_PASSWORD", "False").lower() == "true"
+        is_superuser = os.environ.get("HMS_ADMIN_SUPERUSER", "True").lower() == "true"
 
         if not password:
             self.stdout.write(
@@ -33,6 +34,7 @@ class Command(BaseCommand):
                     "role": role,
                     "is_tenant_admin": True,
                     "is_staff": True,
+                    "is_superuser": is_superuser,
                     "is_active": True,
                 },
             )
@@ -41,6 +43,7 @@ class Command(BaseCommand):
             user.role = role
             user.is_tenant_admin = True
             user.is_staff = True
+            user.is_superuser = is_superuser
             user.is_active = True
 
             if created or reset_password:

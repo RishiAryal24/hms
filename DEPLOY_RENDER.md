@@ -52,6 +52,7 @@ variables to `hms-api`, then redeploy:
 HMS_ADMIN_USERNAME=admin
 HMS_ADMIN_EMAIL=admin@example.com
 HMS_ADMIN_PASSWORD=choose-a-strong-password
+HMS_ADMIN_SUPERUSER=True
 ```
 
 The deploy runs `python manage.py setup_render_admin` and creates the user in
