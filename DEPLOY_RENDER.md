@@ -13,7 +13,7 @@ This repo is configured for a Render Blueprint with:
 3. Apply the blueprint from `render.yaml`.
 4. After Render creates the services, confirm these environment variables:
    - `hms-api`: `DATABASE_URL`, `SECRET_KEY`, `DEBUG=False`
-   - `hms-frontend`: `VITE_API_BASE_URL=https://hms-api.onrender.com/api`
+   - `hms-frontend`: `VITE_API_BASE_URL=https://hms-api-qv4m.onrender.com/api`
 5. Add `HMS_ADMIN_PASSWORD` to the `hms-api` environment variables, then redeploy
    the API to create the initial tenant admin user.
 
@@ -35,7 +35,7 @@ from tenants.models import Client, Domain
 tenant = Client(schema_name="butwalhospital", name="Butwal Hospital")
 tenant.save()
 Domain.objects.create(
-    domain="hms-api.onrender.com",
+    domain="hms-api-qv4m.onrender.com",
     tenant=tenant,
     is_primary=True,
 )

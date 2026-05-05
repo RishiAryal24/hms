@@ -51,4 +51,4 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
-        value: "https://hms-api.onrender.com/api"
+        value: "https://hms-api-qv4m.onrender.com/api"
