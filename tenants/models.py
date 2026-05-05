@@ -31,6 +31,7 @@ class SuperAdmin(AbstractUser):
 
 
 class Client(TenantMixin):
+    schema_name = models.CharField(max_length=63, unique=True)  # ✅ REQUIRED
     name = models.CharField(max_length=100)
     created_on = models.DateField(auto_now_add=True)
     auto_create_schema = True

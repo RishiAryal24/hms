@@ -1,0 +1,36 @@
+from django.core.management.base import BaseCommand
+from django.contrib.auth import get_user_model
+from django_tenants.utils import schema_context
+import os
+
+
+class Command(BaseCommand):
+    help = "Create superuser safely (public schema)"
+
+    def handle(self, *args, **kwargs):
+        User = get_user_model()
+
+        username = os.getenv("DJANGO_SUPERUSER_USERNAME")
+        email = os.getenv("DJANGO_SUPERUSER_EMAIL")
+        password = os.getenv("DJANGO_SUPERUSER_PASSWORD")
+
+        # 🔴 Fail fast if env vars are missing
+        if not all([username, email, password]):
+            self.stdout.write(self.style.ERROR(
+                "❌ Missing environment variables for superuser creation"
+            ))
+            return
+
+        with schema_context('public'):
+
+            user_exists = User.objects.filter(username=username).exists()
+
+            if not user_exists:
+                User.objects.create_superuser(
+                    username=username,
+                    email=email,
+                    password=password
+                )
+                self.stdout.write(self.style.SUCCESS("✅ Superuser created"))
+            else:
+                self.stdout.write("ℹ️ Superuser already exists")
