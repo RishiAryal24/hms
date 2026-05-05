@@ -28,6 +28,10 @@ services:
         value: "butwalhospital"
       - key: TENANT_NAME
         value: "Butwal Hospital"
+      - key: HMS_ADMIN_USERNAME
+        value: "admin"
+      - key: HMS_ADMIN_EMAIL
+        value: "admin@example.com"
       - key: CORS_ALLOWED_ORIGINS
         value: "https://hms-frontend.onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
