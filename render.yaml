@@ -33,9 +33,9 @@ services:
       - key: HMS_ADMIN_EMAIL
         value: "admin@example.com"
       - key: CORS_ALLOWED_ORIGINS
-        value: "https://hms-frontend.onrender.com"
+        value: "https://hms-frontend-qmkh.onrender.com"
       - key: CSRF_TRUSTED_ORIGINS
-        value: "https://hms-frontend.onrender.com"
+        value: "https://hms-frontend-qmkh.onrender.com"
       - key: CORS_ALLOWED_ORIGIN_REGEXES
         value: "https://.*\\.onrender\\.com"
 
