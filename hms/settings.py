@@ -68,6 +68,7 @@ DATABASE_ROUTERS = ["django_tenants.routers.TenantSyncRouter"]
 # MIDDLEWARE
 # ------------------------
 MIDDLEWARE = [
+    "hms.middleware.RenderCorsPreflightMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
