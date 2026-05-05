@@ -8,7 +8,6 @@ import {
   getMedications, addMedication, getNotes, addNote,
   getAdmissions, admitPatient,
 } from "../../api/patients";
-import { completeAppointment } from "../../api/appointments";
 import { Badge, Btn, Modal, Field, Spinner, Empty, Alert, Card, Tabs, InfoRow } from "../../components/ui";
 
 const SEVERITY_COLOR = { mild: "var(--green)", moderate: "var(--amber)", severe: "var(--red)", life_threatening: "var(--red)" };

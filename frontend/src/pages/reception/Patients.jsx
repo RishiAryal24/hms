@@ -70,7 +70,7 @@ export default function Patients() {
           <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "var(--font-display)" }}>Patients</div>
           <div style={{ fontSize: 13, color: "var(--text-mute)", marginTop: 2 }}>{patients.length} records</div>
         </div>
-        <Btn onClick={() => { setModal(true); setStep(1); setError(""); }}>➕ Register Patient</Btn>
+        <Btn onClick={() => { setModal(true); setStep(1); setError(""); }}>Register Patient</Btn>
       </div>
 
       {success && <Alert message={success} type="success" />}
@@ -91,7 +91,7 @@ export default function Patients() {
 
       {/* Table */}
       {loading ? <Spinner /> : patients.length === 0 ? <Empty icon="👥" message="No patients found" /> : (
-        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+        <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -131,7 +131,7 @@ export default function Patients() {
       )}
 
       {/* Register Modal */}
-      <Modal open={showModal} onClose={() => { setModal(false); setStep(1); }} title={`Register Patient — Step ${step}/3`} width={620}>
+      <Modal open={showModal} onClose={() => { setModal(false); setStep(1); }} title={`Register Patient - Step ${step}/3`} width={620}>
         {/* Step bar */}
         <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
           {[1,2,3].map(s => (
@@ -183,11 +183,11 @@ export default function Patients() {
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24,
           paddingTop: 20, borderTop: "1px solid var(--border-light)" }}>
           <Btn variant="secondary" onClick={() => step > 1 ? setStep(s => s - 1) : setModal(false)}>
-            {step === 1 ? "Cancel" : "← Back"}
+            {step === 1 ? "Cancel" : "Back"}
           </Btn>
           {step < 3
-            ? <Btn onClick={() => setStep(s => s + 1)}>Next →</Btn>
-            : <Btn onClick={submit} disabled={saving}>{saving ? "Registering…" : "✓ Register"}</Btn>
+            ? <Btn onClick={() => setStep(s => s + 1)}>Next</Btn>
+            : <Btn onClick={submit} disabled={saving}>{saving ? "Registering..." : "Register"}</Btn>
           }
         </div>
       </Modal>

@@ -53,7 +53,9 @@ export default function Appointments() {
     try {
       const { data } = await checkAvailability({ doctor: form.doctor, date: form.appointment_date });
       setAvail(data);
-    } catch {}
+    } catch {
+      setAvail(null);
+    }
   };
 
   useEffect(() => { if (form.doctor && form.appointment_date) checkAvail(); }, [form.doctor, form.appointment_date]);
@@ -78,7 +80,9 @@ export default function Appointments() {
       await cancelAppointment(cancelId, { reason: cancelReason });
       setCancelId(null); setReason("");
       load();
-    } catch {}
+    } catch {
+      setError("Unable to cancel appointment.");
+    }
   };
 
   const patientOpts = patients.map(p => ({ value: p.id, label: `${p.full_name} (${p.patient_id})` }));
@@ -92,7 +96,7 @@ export default function Appointments() {
           <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "var(--font-display)" }}>Appointments</div>
           <div style={{ fontSize: 13, color: "var(--text-mute)", marginTop: 2 }}>{appointments.length} records</div>
         </div>
-        <Btn onClick={() => { setModal(true); setError(""); }}>📅 Book Appointment</Btn>
+        <Btn onClick={() => { setModal(true); setError(""); }}>Book Appointment</Btn>
       </div>
 
       {success && <Alert message={success} type="success" />}
@@ -118,7 +122,7 @@ export default function Appointments() {
 
       {/* Table */}
       {loading ? <Spinner /> : appointments.length === 0 ? <Empty icon="📅" message="No appointments found" /> : (
-        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+        <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -198,7 +202,7 @@ export default function Appointments() {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--border-light)" }}>
           <Btn variant="secondary" onClick={() => setModal(false)}>Cancel</Btn>
           <Btn onClick={submit} disabled={saving || availability?.available === false}>
-            {saving ? "Booking…" : "✓ Book Appointment"}
+            {saving ? "Booking..." : "Book Appointment"}
           </Btn>
         </div>
       </Modal>

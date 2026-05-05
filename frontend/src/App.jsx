@@ -1,29 +1,19 @@
-// LOCATION: HMS/frontend/src/App.jsx — REPLACE entire file
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import useAuthStore from "./store/authStore";
 import AppLayout from "./layouts/AppLayout";
 import Login from "./pages/auth/Login";
 
-// Reception
 import ReceptionDashboard from "./pages/reception/index";
-import ReceptionPatients  from "./pages/reception/Patients";
-import ReceptionAppts     from "./pages/reception/Appointments";
+import ReceptionPatients from "./pages/reception/Patients";
+import ReceptionAppts from "./pages/reception/Appointments";
 
-// Doctor
-import DoctorDashboard    from "./pages/doctor/index";
-import DoctorPatients     from "./pages/doctor/Patients";
-import DoctorAppts        from "./pages/doctor/Appointments";
-import PatientDetail      from "./pages/doctor/PatientDetail";
+import DoctorDashboard from "./pages/doctor/index";
+import DoctorPatients from "./pages/doctor/Patients";
+import DoctorAppts from "./pages/doctor/Appointments";
+import PatientDetail from "./pages/doctor/PatientDetail";
 
-// Admin
-import AdminDashboard     from "./pages/admin/index";
-import Staff              from "./pages/admin/Staff";
-
-function RequireAuth({ children }) {
-  const { user } = useAuthStore();
-  return user ? children : <Navigate to="/login" replace />;
-}
+import AdminDashboard from "./pages/admin/index";
+import Staff from "./pages/admin/Staff";
 
 function getRole(user) {
   if (!user) return null;
@@ -34,11 +24,22 @@ function getDefaultRoute(user) {
   const role = getRole(user);
   const map = {
     hospital_admin: "/admin",
-    doctor:         "/doctor",
-    nurse:          "/doctor",
-    receptionist:   "/reception",
+    doctor: "/doctor",
+    nurse: "/doctor",
+    receptionist: "/reception",
   };
   return map[role] || "/reception";
+}
+
+function RequireAuth({ children }) {
+  const { user } = useAuthStore();
+  return user ? children : <Navigate to="/login" replace />;
+}
+
+function RequireRole({ allowed, children }) {
+  const { user } = useAuthStore();
+  const role = getRole(user);
+  return allowed.includes(role) ? children : <Navigate to={getDefaultRoute(user)} replace />;
 }
 
 export default function App() {
@@ -52,23 +53,20 @@ export default function App() {
         <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
           <Route index element={<Navigate to={getDefaultRoute(user)} replace />} />
 
-          {/* Reception */}
-          <Route path="reception"              element={<ReceptionDashboard />} />
-          <Route path="reception/patients"     element={<ReceptionPatients />} />
-          <Route path="reception/appointments" element={<ReceptionAppts />} />
+          <Route path="reception" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionDashboard /></RequireRole>} />
+          <Route path="reception/patients" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionPatients /></RequireRole>} />
+          <Route path="reception/appointments" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionAppts /></RequireRole>} />
 
-          {/* Doctor */}
-          <Route path="doctor"                    element={<DoctorDashboard />} />
-          <Route path="doctor/patients"           element={<DoctorPatients />} />
-          <Route path="doctor/patients/:id"       element={<PatientDetail />} />
-          <Route path="doctor/appointments"       element={<DoctorAppts />} />
+          <Route path="doctor" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorDashboard /></RequireRole>} />
+          <Route path="doctor/patients" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorPatients /></RequireRole>} />
+          <Route path="doctor/patients/:id" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><PatientDetail /></RequireRole>} />
+          <Route path="doctor/appointments" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorAppts /></RequireRole>} />
 
-          {/* Admin — also has access to doctor views */}
-          <Route path="admin"                     element={<AdminDashboard />} />
-          <Route path="admin/staff"               element={<Staff />} />
-          <Route path="admin/patients"            element={<DoctorPatients />} />
-          <Route path="admin/patients/:id"        element={<PatientDetail />} />
-          <Route path="admin/appointments"        element={<ReceptionAppts />} />
+          <Route path="admin" element={<RequireRole allowed={["hospital_admin"]}><AdminDashboard /></RequireRole>} />
+          <Route path="admin/staff" element={<RequireRole allowed={["hospital_admin"]}><Staff /></RequireRole>} />
+          <Route path="admin/patients" element={<RequireRole allowed={["hospital_admin"]}><DoctorPatients /></RequireRole>} />
+          <Route path="admin/patients/:id" element={<RequireRole allowed={["hospital_admin"]}><PatientDetail /></RequireRole>} />
+          <Route path="admin/appointments" element={<RequireRole allowed={["hospital_admin"]}><ReceptionAppts /></RequireRole>} />
         </Route>
 
         <Route path="*" element={<Navigate to={user ? getDefaultRoute(user) : "/login"} replace />} />

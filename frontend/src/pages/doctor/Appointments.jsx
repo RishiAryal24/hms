@@ -3,8 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAppointments, getTodayAppointments, completeAppointment, cancelAppointment, bookAppointment, checkAvailability } from "../../api/appointments";
-import { getPatients } from "../../api/patients";
+import { getAppointments, getTodayAppointments, completeAppointment, bookAppointment, checkAvailability } from "../../api/appointments";
 import { Badge, Btn, Modal, Field, Spinner, Empty, Alert, Tabs } from "../../components/ui";
 import useAuthStore from "../../store/authStore";
 
@@ -30,7 +29,6 @@ export default function DoctorAppointments() {
   // Follow-up modal
   const [followUpAppt, setFollowUp] = useState(null);
   const [followForm, setFollowForm] = useState({ appointment_date:"", appointment_time:"", chief_complaint:"", consultation_fee:"" });
-  const [patients, setPatients]     = useState([]);
   const [availability, setAvail]    = useState(null);
 
   const loadToday = () => {
@@ -54,7 +52,9 @@ export default function DoctorAppointments() {
   useEffect(() => {
     if (followUpAppt && followForm.appointment_date) {
       checkAvailability({ doctor: user?.id, date: followForm.appointment_date })
-        .then(r => setAvail(r.data)).catch(() => {});
+        .then(r => setAvail(r.data)).catch(() => {
+          setAvail(null);
+        });
     }
   }, [followForm.appointment_date]);
 
@@ -92,7 +92,7 @@ export default function DoctorAppointments() {
     } finally { setSaving(false); }
   };
 
-  const AppointmentRow = ({ a, onComplete, onFollowUp }) => (
+  const AppointmentRow = ({ a }) => (
     <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12,
       padding: "16px 20px", marginBottom: 10, display: "flex",
       justifyContent: "space-between", alignItems: "center" }}>

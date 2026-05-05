@@ -46,7 +46,9 @@ export default function Staff() {
     setSaving(true); setError("");
     try {
       if (editId) {
-        const { password, username, ...rest } = form;
+        const rest = { ...form };
+        delete rest.password;
+        delete rest.username;
         await updateStaff(editId, rest);
         setSuccess("Staff updated successfully.");
       } else {
@@ -88,13 +90,13 @@ export default function Staff() {
           <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "var(--font-display)" }}>Staff Management</div>
           <div style={{ fontSize: 13, color: "var(--text-mute)", marginTop: 2 }}>{staff.length} members</div>
         </div>
-        <Btn onClick={openAdd}>➕ Add Staff</Btn>
+        <Btn onClick={openAdd}>Add Staff</Btn>
       </div>
 
       {success && <Alert message={success} type="success" />}
 
       {loading ? <Spinner /> : staff.length === 0 ? <Empty icon="👤" message="No staff members yet" /> : (
-        <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+        <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>

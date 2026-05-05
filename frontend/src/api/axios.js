@@ -31,7 +31,7 @@ api.interceptors.response.use(
           { refresh }
         );
         localStorage.setItem("access", data.access);
-        localStorage.setItem("refresh", data.refresh);
+        if (data.refresh) localStorage.setItem("refresh", data.refresh);
         original.headers.Authorization = `Bearer ${data.access}`;
         return api(original);
       } catch {
