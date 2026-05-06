@@ -8,6 +8,7 @@ const NAV = {
     { to: "/reception", icon: "D", label: "Dashboard" },
     { to: "/reception/patients", icon: "P", label: "Patients" },
     { to: "/reception/appointments", icon: "A", label: "Appointments" },
+    { to: "/reception/ipd", icon: "I", label: "IPD" },
   ],
   doctor: [
     { to: "/doctor", icon: "D", label: "Dashboard" },
@@ -17,6 +18,7 @@ const NAV = {
   hospital_admin: [
     { to: "/admin", icon: "D", label: "Dashboard" },
     { to: "/admin/staff", icon: "S", label: "Staff" },
+    { to: "/admin/ipd", icon: "I", label: "IPD" },
     { to: "/admin/patients", icon: "P", label: "Patients" },
     { to: "/admin/appointments", icon: "A", label: "Appointments" },
   ],

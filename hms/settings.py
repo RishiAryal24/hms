@@ -50,6 +50,7 @@ SHARED_APPS = [
 TENANT_APPS = [
     "patients",
     "appointments",
+    "inpatient",
     "core",
 ]
 

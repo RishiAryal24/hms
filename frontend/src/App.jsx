@@ -14,6 +14,7 @@ import PatientDetail from "./pages/doctor/PatientDetail";
 
 import AdminDashboard from "./pages/admin/index";
 import Staff from "./pages/admin/Staff";
+import IPD from "./pages/admin/IPD";
 
 function getRole(user) {
   if (!user) return null;
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="reception" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionDashboard /></RequireRole>} />
           <Route path="reception/patients" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionPatients /></RequireRole>} />
           <Route path="reception/appointments" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionAppts /></RequireRole>} />
+          <Route path="reception/ipd" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><IPD /></RequireRole>} />
 
           <Route path="doctor" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorDashboard /></RequireRole>} />
           <Route path="doctor/patients" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorPatients /></RequireRole>} />
@@ -64,6 +66,7 @@ export default function App() {
 
           <Route path="admin" element={<RequireRole allowed={["hospital_admin"]}><AdminDashboard /></RequireRole>} />
           <Route path="admin/staff" element={<RequireRole allowed={["hospital_admin"]}><Staff /></RequireRole>} />
+          <Route path="admin/ipd" element={<RequireRole allowed={["hospital_admin"]}><IPD /></RequireRole>} />
           <Route path="admin/patients" element={<RequireRole allowed={["hospital_admin"]}><DoctorPatients /></RequireRole>} />
           <Route path="admin/patients/:id" element={<RequireRole allowed={["hospital_admin"]}><PatientDetail /></RequireRole>} />
           <Route path="admin/appointments" element={<RequireRole allowed={["hospital_admin"]}><ReceptionAppts /></RequireRole>} />

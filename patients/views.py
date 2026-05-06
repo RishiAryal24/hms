@@ -293,6 +293,9 @@ class DischargePatientView(APIView):
         admission.diagnosis_on_discharge = request.data.get('diagnosis_on_discharge', '')
         admission.discharge_summary      = request.data.get('discharge_summary', '')
         admission.save()
+        active_assignment = admission.bed_assignments.filter(status='active').first()
+        if active_assignment:
+            active_assignment.release()
         return Response(AdmissionRecordSerializer(admission).data)
 
 
