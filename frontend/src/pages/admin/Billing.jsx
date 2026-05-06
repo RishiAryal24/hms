@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addInvoiceLine,
   createChargeItem,
@@ -6,6 +6,7 @@ import {
   createPayment,
   getBillingSummary,
   getChargeItems,
+  getInvoice,
   getInvoices,
   issueInvoice,
 } from "../../api/billing";
@@ -45,7 +46,10 @@ export default function Billing() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [detailInvoice, setDetailInvoice] = useState(null);
+  const [patientFilter, setPatientFilter] = useState("");
   const [invoiceModal, setInvoiceModal] = useState(false);
+  const [detailModal, setDetailModal] = useState(false);
   const [chargeModal, setChargeModal] = useState(false);
   const [lineModal, setLineModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
@@ -57,13 +61,13 @@ export default function Billing() {
 
   const canConfigureCharges = !!(user?.is_tenant_admin || user?.is_superuser);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [summaryRes, invoiceRes, chargeRes, patientRes] = await Promise.all([
         getBillingSummary(),
-        getInvoices(),
+        getInvoices({ patient: patientFilter || undefined }),
         getChargeItems(),
         getPatients({ page_size: 200 }),
       ]);
@@ -76,9 +80,9 @@ export default function Billing() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [patientFilter]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   const patientOptions = patients.map((patient) => ({
     value: patient.id,
@@ -198,6 +202,90 @@ export default function Billing() {
     setPaymentModal(true);
   };
 
+  const openDetailModal = async (invoice) => {
+    setError("");
+    try {
+      const { data } = await getInvoice(invoice.id);
+      setDetailInvoice(data);
+      setDetailModal(true);
+    } catch {
+      setError("Unable to load invoice details.");
+    }
+  };
+
+  const printInvoice = (invoice) => {
+    const rows = (invoice.lines || []).map((line) => `
+      <tr>
+        <td>${line.description}</td>
+        <td>${line.category}</td>
+        <td>${line.quantity}</td>
+        <td>Rs. ${line.unit_price}</td>
+        <td>Rs. ${line.line_total}</td>
+      </tr>
+    `).join("");
+    const payments = (invoice.payments || []).map((payment) => `
+      <tr>
+        <td>${new Date(payment.received_at).toLocaleString()}</td>
+        <td>${payment.method}</td>
+        <td>${payment.reference || "-"}</td>
+        <td>Rs. ${payment.amount}</td>
+      </tr>
+    `).join("");
+    const popup = window.open("", "_blank", "width=900,height=700");
+    popup.document.write(`
+      <html>
+        <head>
+          <title>${invoice.invoice_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 28px; color: #111827; }
+            h1 { margin: 0 0 4px; font-size: 24px; }
+            .muted { color: #6b7280; font-size: 13px; }
+            .top { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+            th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 13px; }
+            th { color: #6b7280; text-transform: uppercase; font-size: 11px; }
+            .totals { margin-left: auto; width: 280px; margin-top: 18px; }
+            .totals div { display: flex; justify-content: space-between; padding: 6px 0; }
+            @media print { button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()">Print</button>
+          <div class="top">
+            <div>
+              <h1>Butwal Hospital</h1>
+              <div class="muted">Invoice / Receipt</div>
+            </div>
+            <div>
+              <div><strong>${invoice.invoice_number}</strong></div>
+              <div class="muted">Status: ${invoice.status}</div>
+              <div class="muted">Date: ${new Date(invoice.created_at).toLocaleString()}</div>
+            </div>
+          </div>
+          <div><strong>Patient:</strong> ${invoice.patient_detail?.full_name || "-"} (${invoice.patient_detail?.patient_id || "-"})</div>
+          <table>
+            <thead><tr><th>Description</th><th>Category</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="totals">
+            <div><span>Subtotal</span><strong>Rs. ${invoice.subtotal}</strong></div>
+            <div><span>Discount</span><strong>Rs. ${invoice.discount_amount}</strong></div>
+            <div><span>Tax</span><strong>Rs. ${invoice.tax_amount}</strong></div>
+            <div><span>Total</span><strong>Rs. ${invoice.total_amount}</strong></div>
+            <div><span>Paid</span><strong>Rs. ${invoice.paid_amount}</strong></div>
+            <div><span>Balance</span><strong>Rs. ${invoice.balance_amount}</strong></div>
+          </div>
+          <h2>Payments</h2>
+          <table>
+            <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead>
+            <tbody>${payments || "<tr><td colspan='4'>No payments recorded</td></tr>"}</tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
+
   return (
     <div className="page-enter" style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
@@ -223,8 +311,15 @@ export default function Billing() {
 
       <Tabs tabs={[{ key: "invoices", label: "Invoices" }, { key: "charges", label: "Charge Master" }]} active={tab} onChange={setTab} />
 
+      {tab === "invoices" && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 16, maxWidth: 420 }}>
+          <Field label="" name="patient_filter" value={patientFilter} onChange={(event) => setPatientFilter(event.target.value)} options={patientOptions} />
+          <Btn variant="secondary" onClick={() => setPatientFilter("")} disabled={!patientFilter}>Clear</Btn>
+        </div>
+      )}
+
       {loading ? <Spinner /> : tab === "invoices" ? (
-        <InvoicesTable invoices={invoices} onIssue={markIssued} onAddLine={openLineModal} onPayment={openPaymentModal} />
+        <InvoicesTable invoices={invoices} onIssue={markIssued} onAddLine={openLineModal} onPayment={openPaymentModal} onView={openDetailModal} />
       ) : (
         <ChargesTable charges={charges} />
       )}
@@ -276,6 +371,28 @@ export default function Billing() {
           <Btn onClick={savePayment} disabled={saving || !paymentForm.amount}>Record Payment</Btn>
         </div>
       </Modal>
+
+      <Modal open={detailModal} onClose={() => setDetailModal(false)} title={`Invoice ${detailInvoice?.invoice_number || ""}`} width={860}>
+        {detailInvoice && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
+              <Card><Metric label="Total" value={`Rs. ${detailInvoice.total_amount}`} color="var(--blue)" /></Card>
+              <Card><Metric label="Paid" value={`Rs. ${detailInvoice.paid_amount}`} color="var(--green)" /></Card>
+              <Card><Metric label="Balance" value={`Rs. ${detailInvoice.balance_amount}`} color="var(--amber)" /></Card>
+              <Card><Metric label="Status" value={detailInvoice.status} color={STATUS_COLOR[detailInvoice.status] || "var(--text-mute)"} /></Card>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 16, marginBottom: 14 }}>
+              <div>
+                <div style={{ fontWeight: 700 }}>{detailInvoice.patient_detail?.full_name || "-"}</div>
+                <div style={{ color: "var(--text-mute)", fontSize: 12 }}>{detailInvoice.patient_detail?.patient_id || ""}</div>
+              </div>
+              <Btn variant="secondary" onClick={() => printInvoice(detailInvoice)}>Print</Btn>
+            </div>
+            <InvoiceLines lines={detailInvoice.lines || []} />
+            <PaymentsTable payments={detailInvoice.payments || []} />
+          </>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -289,7 +406,7 @@ function Metric({ label, value, color = "var(--teal)" }) {
   );
 }
 
-function InvoicesTable({ invoices, onIssue, onAddLine, onPayment }) {
+function InvoicesTable({ invoices, onIssue, onAddLine, onPayment, onView }) {
   if (!invoices.length) return <Empty icon="BL" message="No invoices yet" />;
   return (
     <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
@@ -307,6 +424,7 @@ function InvoicesTable({ invoices, onIssue, onAddLine, onPayment }) {
               <Td>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   {invoice.status === "draft" && <Btn size="sm" variant="secondary" onClick={() => onIssue(invoice)}>Issue</Btn>}
+                  <Btn size="sm" variant="ghost" onClick={() => onView(invoice)}>View</Btn>
                   <Btn size="sm" variant="ghost" onClick={() => onAddLine(invoice)}>Line</Btn>
                   <Btn size="sm" onClick={() => onPayment(invoice)} disabled={invoice.status === "paid" || invoice.status === "cancelled"}>Pay</Btn>
                 </div>
@@ -337,6 +455,53 @@ function ChargesTable({ charges }) {
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function InvoiceLines({ lines }) {
+  if (!lines.length) return <Empty icon="LN" message="No line items yet" />;
+  return (
+    <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead><tr>{["Description", "Category", "Qty", "Rate", "Total"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <tbody>
+          {lines.map((line) => (
+            <tr key={line.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+              <Td>{line.description}</Td>
+              <Td>{line.category}</Td>
+              <Td>{line.quantity}</Td>
+              <Td>Rs. {line.unit_price}</Td>
+              <Td>Rs. {line.line_total}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PaymentsTable({ payments }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 8 }}>Payments</div>
+      {!payments.length ? <Empty icon="PY" message="No payments recorded" /> : (
+        <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>{["Date", "Method", "Reference", "Amount"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+            <tbody>
+              {payments.map((payment) => (
+                <tr key={payment.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                  <Td>{new Date(payment.received_at).toLocaleString()}</Td>
+                  <Td>{payment.method}</Td>
+                  <Td>{payment.reference || "-"}</Td>
+                  <Td>Rs. {payment.amount}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -144,6 +144,12 @@ class NursingRoundSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class AdmissionDischargeSerializer(serializers.Serializer):
+    diagnosis_on_discharge = serializers.CharField(required=False, allow_blank=True)
+    discharge_summary = serializers.CharField(required=False, allow_blank=True)
+    generate_bed_charges = serializers.BooleanField(default=True)
+
+
 class DoctorRoundSerializer(serializers.ModelSerializer):
     admission_number = serializers.CharField(source="admission.admission_number", read_only=True)
     doctor_name = serializers.CharField(source="doctor.get_full_name", read_only=True)

@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDoctorProfiles } from "../../api/clinical";
-import { assignBed, createBed, createDoctorRound, createWard, getActiveAdmissions, getBeds, getWards } from "../../api/inpatient";
+import {
+  assignBed,
+  createBed,
+  createDoctorRound,
+  createNursingRound,
+  createWard,
+  dischargeAdmission,
+  getActiveAdmissions,
+  getBeds,
+  getDoctorRounds,
+  getNursingRounds,
+  getWards,
+} from "../../api/inpatient";
 import { Alert, Badge, Btn, Card, Empty, Field, Modal, Spinner, Tabs } from "../../components/ui";
 import useAuthStore from "../../store/authStore";
 
@@ -25,6 +37,8 @@ const emptyWard = { name: "", ward_type: "general", department: "", floor: "", i
 const emptyBed = { ward: "", bed_number: "", status: "available", daily_rate: "", notes: "" };
 const emptyAssign = { admission: "", bed: "", notes: "" };
 const emptyDoctorRound = { admission: "", doctor: "", condition: "", diagnosis: "", treatment_plan: "", notes: "", visit_fee: "" };
+const emptyNursingRound = { admission: "", condition: "", intake_output: "", pain_score: "", notes: "" };
+const emptyDischarge = { admission: "", diagnosis_on_discharge: "", discharge_summary: "", generate_bed_charges: true };
 
 export default function IPD() {
   const { user } = useAuthStore();
@@ -40,10 +54,16 @@ export default function IPD() {
   const [bedModal, setBedModal] = useState(false);
   const [assignModal, setAssignModal] = useState(false);
   const [roundModal, setRoundModal] = useState(false);
+  const [nursingModal, setNursingModal] = useState(false);
+  const [historyModal, setHistoryModal] = useState(false);
+  const [dischargeModal, setDischargeModal] = useState(false);
   const [wardForm, setWardForm] = useState(emptyWard);
   const [bedForm, setBedForm] = useState(emptyBed);
   const [assignForm, setAssignForm] = useState(emptyAssign);
   const [roundForm, setRoundForm] = useState(emptyDoctorRound);
+  const [nursingForm, setNursingForm] = useState(emptyNursingRound);
+  const [dischargeForm, setDischargeForm] = useState(emptyDischarge);
+  const [roundHistory, setRoundHistory] = useState({ admission: null, doctors: [], nursing: [] });
   const [saving, setSaving] = useState(false);
   const canConfigureBeds = !!(user?.is_tenant_admin || user?.is_superuser);
 
@@ -94,6 +114,11 @@ export default function IPD() {
   const handleWard = (event) => setWardForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleBed = (event) => setBedForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleAssign = (event) => setAssignForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleNursing = (event) => setNursingForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleDischarge = (event) => {
+    const { name, value, type, checked } = event.target;
+    setDischargeForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  };
   const handleRound = (event) => {
     const next = { ...roundForm, [event.target.name]: event.target.value };
     if (event.target.name === "doctor") {
@@ -180,6 +205,66 @@ export default function IPD() {
     }
   };
 
+  const openNursingModal = (admission) => {
+    setNursingForm({ ...emptyNursingRound, admission: admission.id });
+    setNursingModal(true);
+  };
+
+  const saveNursingRound = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await createNursingRound(nursingForm.admission, nursingForm);
+      setNursingModal(false);
+      setNursingForm(emptyNursingRound);
+      setSuccess("Nursing round recorded.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openHistoryModal = async (admission) => {
+    setHistoryModal(true);
+    setRoundHistory({ admission, doctors: [], nursing: [] });
+    try {
+      const [doctorRes, nursingRes] = await Promise.all([
+        getDoctorRounds(admission.id),
+        getNursingRounds(admission.id),
+      ]);
+      setRoundHistory({
+        admission,
+        doctors: doctorRes.data.results || doctorRes.data,
+        nursing: nursingRes.data.results || nursingRes.data,
+      });
+    } catch {
+      setError("Unable to load round history.");
+    }
+  };
+
+  const openDischargeModal = (admission) => {
+    setDischargeForm({ ...emptyDischarge, admission: admission.id });
+    setDischargeModal(true);
+  };
+
+  const saveDischarge = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await dischargeAdmission(dischargeForm.admission, dischargeForm);
+      setDischargeModal(false);
+      setDischargeForm(emptyDischarge);
+      setSuccess("Patient discharged and discharge bill prepared.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="page-enter" style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
@@ -209,7 +294,15 @@ export default function IPD() {
       {loading ? <Spinner /> : (
         <>
           {tab === "beds" && <BedsTable beds={beds} />}
-          {tab === "admissions" && <AdmissionsTable admissions={admissions} onDoctorRound={openRoundModal} />}
+          {tab === "admissions" && (
+            <AdmissionsTable
+              admissions={admissions}
+              onDoctorRound={openRoundModal}
+              onNursingRound={openNursingModal}
+              onHistory={openHistoryModal}
+              onDischarge={openDischargeModal}
+            />
+          )}
           {tab === "wards" && <WardsTable wards={wards} />}
         </>
       )}
@@ -261,6 +354,40 @@ export default function IPD() {
           <Btn onClick={saveDoctorRound} disabled={saving || !roundForm.doctor || !roundForm.notes}>Save Round</Btn>
         </div>
       </Modal>
+
+      <Modal open={nursingModal} onClose={() => setNursingModal(false)} title="Nursing Round" width={560}>
+        <Field label="Condition" name="condition" value={nursingForm.condition} onChange={handleNursing} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Pain Score" name="pain_score" value={nursingForm.pain_score} onChange={handleNursing} type="number" />
+          <Field label="Intake / Output" name="intake_output" value={nursingForm.intake_output} onChange={handleNursing} />
+        </div>
+        <Field label="Notes" name="notes" value={nursingForm.notes} onChange={handleNursing} required />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setNursingModal(false)}>Cancel</Btn>
+          <Btn onClick={saveNursingRound} disabled={saving || !nursingForm.notes}>Save Round</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={historyModal} onClose={() => setHistoryModal(false)} title={`Rounds - ${roundHistory.admission?.admission_number || ""}`} width={760}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <RoundList title="Doctor Rounds" items={roundHistory.doctors} kind="doctor" />
+          <RoundList title="Nursing Rounds" items={roundHistory.nursing} kind="nursing" />
+        </div>
+      </Modal>
+
+      <Modal open={dischargeModal} onClose={() => setDischargeModal(false)} title="Discharge Patient" width={560}>
+        <Field label="Diagnosis on Discharge" name="diagnosis_on_discharge" value={dischargeForm.diagnosis_on_discharge} onChange={handleDischarge} />
+        <Field label="Discharge Summary" name="discharge_summary" value={dischargeForm.discharge_summary} onChange={handleDischarge} />
+        <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 16px", color: "var(--text-mute)", fontSize: 13 }}>
+          <input type="checkbox" name="generate_bed_charges" checked={dischargeForm.generate_bed_charges} onChange={handleDischarge} />
+          Add bed-day charges to the discharge bill
+        </label>
+        <Alert type="warning" message="Discharging releases the active bed and removes this patient from active IPD admissions." />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setDischargeModal(false)}>Cancel</Btn>
+          <Btn onClick={saveDischarge} disabled={saving}>Discharge</Btn>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -296,7 +423,7 @@ function BedsTable({ beds }) {
   );
 }
 
-function AdmissionsTable({ admissions, onDoctorRound }) {
+function AdmissionsTable({ admissions, onDoctorRound, onNursingRound, onHistory, onDischarge }) {
   if (!admissions.length) return <Empty icon="IPD" message="No active admissions" />;
   return (
     <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
@@ -311,7 +438,14 @@ function AdmissionsTable({ admissions, onDoctorRound }) {
               <Td>{admission.department || "-"}</Td>
               <Td>{admission.active_bed?.bed_label || "Unassigned"}</Td>
               <Td>{new Date(admission.admission_date).toLocaleDateString()}</Td>
-              <Td><Btn size="sm" variant="secondary" onClick={() => onDoctorRound(admission)}>Doctor Round</Btn></Td>
+              <Td>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <Btn size="sm" variant="secondary" onClick={() => onDoctorRound(admission)}>Doctor</Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => onNursingRound(admission)}>Nursing</Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => onHistory(admission)}>History</Btn>
+                  <Btn size="sm" onClick={() => onDischarge(admission)}>Discharge</Btn>
+                </div>
+              </Td>
             </tr>
           ))}
         </tbody>
@@ -338,6 +472,34 @@ function WardsTable({ wards }) {
           </div>
         </Card>
       ))}
+    </div>
+  );
+}
+
+function RoundList({ title, items, kind }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 10 }}>{title}</div>
+      {!items.length ? <Empty icon={kind === "doctor" ? "DR" : "NS"} message={`No ${kind} rounds yet`} /> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {items.map((item) => (
+            <Card key={`${kind}-${item.id}`}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontWeight: 700 }}>{kind === "doctor" ? item.doctor_name : item.nurse_name}</div>
+                <div style={{ color: "var(--text-dim)", fontSize: 11 }}>{new Date(item.round_time).toLocaleString()}</div>
+              </div>
+              <div style={{ color: "var(--text-mute)", fontSize: 12, marginTop: 6 }}>
+                {item.condition || item.diagnosis || item.notes}
+              </div>
+              {kind === "doctor" && item.invoice_number && (
+                <div style={{ color: "var(--green)", fontSize: 12, marginTop: 6 }}>
+                  {item.invoice_number} / Rs. {item.invoice_line_total}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

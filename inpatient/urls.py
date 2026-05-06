@@ -16,4 +16,5 @@ urlpatterns = [
     path("transfers/create/", views.BedTransferView.as_view(), name="ipd-transfer-create"),
     path("admissions/<int:admission_pk>/nursing-rounds/", views.NursingRoundListCreateView.as_view(), name="ipd-nursing-rounds"),
     path("admissions/<int:admission_pk>/doctor-rounds/", views.DoctorRoundListCreateView.as_view(), name="ipd-doctor-rounds"),
+    path("admissions/<int:admission_pk>/discharge/", views.DischargeAdmissionView.as_view(), name="ipd-discharge"),
 ]

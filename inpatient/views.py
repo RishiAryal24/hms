@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db.models import Count, Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -11,6 +13,7 @@ from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorRound, Nur
 from .serializers import (
     BedAssignmentSerializer,
     BedSerializer,
+    AdmissionDischargeSerializer,
     DoctorRoundSerializer,
     BedTransferReadSerializer,
     BedTransferSerializer,
@@ -25,6 +28,7 @@ CanManageBeds = role_required("receptionist", "nurse")
 CanViewIPD = role_required("receptionist", "doctor", "nurse", "billing_staff")
 CanNursing = role_required("nurse", "doctor")
 CanDoctorRound = role_required("receptionist", "doctor", "nurse")
+CanDischarge = role_required("doctor")
 
 
 class WardListCreateView(generics.ListCreateAPIView):
@@ -195,3 +199,58 @@ class DoctorRoundListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         admission = AdmissionRecord.objects.get(pk=self.kwargs["admission_pk"], status="admitted")
         serializer.save(admission=admission)
+
+
+class DischargeAdmissionView(APIView):
+    permission_classes = [CanDischarge]
+
+    def post(self, request, admission_pk):
+        serializer = AdmissionDischargeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        admission = AdmissionRecord.objects.select_related("patient").get(pk=admission_pk, status="admitted")
+        discharge_time = timezone.now()
+
+        if serializer.validated_data["generate_bed_charges"]:
+            generate_bed_charges(admission, request.user, discharge_time)
+
+        admission.status = "discharged"
+        admission.discharge_date = discharge_time
+        admission.diagnosis_on_discharge = serializer.validated_data.get("diagnosis_on_discharge", "")
+        admission.discharge_summary = serializer.validated_data.get("discharge_summary", "")
+        admission.save(update_fields=[
+            "status", "discharge_date", "diagnosis_on_discharge",
+            "discharge_summary", "updated_at",
+        ])
+
+        active_assignment = admission.bed_assignments.filter(status="active").select_related("bed").first()
+        if active_assignment:
+            active_assignment.release()
+
+        return Response(IPDAdmissionSerializer(admission).data)
+
+
+def generate_bed_charges(admission, user, end_time):
+    from billing.models import ChargeCategory
+    from billing.services import add_billable_line
+
+    assignments = BedAssignment.objects.filter(admission=admission).select_related("bed", "bed__ward", "bed__room")
+    for assignment in assignments:
+        bed = assignment.bed
+        daily_rate = Decimal(str(bed.effective_daily_rate or 0))
+        if daily_rate <= 0:
+            continue
+
+        charge_end = assignment.released_at or end_time
+        stay_seconds = max((charge_end - assignment.assigned_at).total_seconds(), 0)
+        days = max(1, int((stay_seconds + 86399) // 86400))
+        add_billable_line(
+            patient=admission.patient,
+            admission=admission,
+            created_by=user,
+            description=f"IPD bed charge - {bed.ward.name} {bed.bed_number} ({days} day{'s' if days != 1 else ''})",
+            category=ChargeCategory.IPD,
+            quantity=days,
+            unit_price=daily_rate,
+            source_module="inpatient.bed_assignment",
+            source_id=assignment.id,
+        )

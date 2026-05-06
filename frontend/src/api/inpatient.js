@@ -21,3 +21,4 @@ export const getNursingRounds = (admissionId) => api.get(`/inpatient/admissions/
 export const createNursingRound = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/nursing-rounds/`, data);
 export const getDoctorRounds = (admissionId) => api.get(`/inpatient/admissions/${admissionId}/doctor-rounds/`);
 export const createDoctorRound = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/doctor-rounds/`, data);
+export const dischargeAdmission = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/discharge/`, data);
