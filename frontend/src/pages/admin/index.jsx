@@ -65,6 +65,7 @@ export default function AdminDashboard() {
       <div className="quick-actions" style={{ display: "flex", gap: 12, marginBottom: 28 }}>
         {[
           { label: "Add Staff", to: "/admin/staff", color: "var(--teal)" },
+          { label: "Clinical Staff", to: "/admin/clinical", color: "var(--blue)" },
           { label: "Manage IPD", to: "/admin/ipd", color: "var(--blue)" },
           { label: "Billing", to: "/admin/billing", color: "var(--green)" },
           { label: "View Patients", to: "/admin/patients", color: "var(--purple)" },
