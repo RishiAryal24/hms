@@ -9,6 +9,7 @@ const NAV = {
     { to: "/reception/patients", icon: "P", label: "Patients" },
     { to: "/reception/appointments", icon: "A", label: "Appointments" },
     { to: "/reception/ipd", icon: "I", label: "IPD" },
+    { to: "/reception/billing", icon: "B", label: "Billing" },
   ],
   doctor: [
     { to: "/doctor", icon: "D", label: "Dashboard" },
@@ -19,6 +20,7 @@ const NAV = {
     { to: "/admin", icon: "D", label: "Dashboard" },
     { to: "/admin/staff", icon: "S", label: "Staff" },
     { to: "/admin/ipd", icon: "I", label: "IPD" },
+    { to: "/admin/billing", icon: "B", label: "Billing" },
     { to: "/admin/patients", icon: "P", label: "Patients" },
     { to: "/admin/appointments", icon: "A", label: "Appointments" },
   ],
@@ -26,6 +28,9 @@ const NAV = {
     { to: "/doctor", icon: "D", label: "Dashboard" },
     { to: "/doctor/patients", icon: "P", label: "Patients" },
     { to: "/doctor/appointments", icon: "A", label: "Appointments" },
+  ],
+  billing_staff: [
+    { to: "/billing", icon: "B", label: "Billing" },
   ],
 };
 

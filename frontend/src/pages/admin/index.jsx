@@ -66,6 +66,7 @@ export default function AdminDashboard() {
         {[
           { label: "Add Staff", to: "/admin/staff", color: "var(--teal)" },
           { label: "Manage IPD", to: "/admin/ipd", color: "var(--blue)" },
+          { label: "Billing", to: "/admin/billing", color: "var(--green)" },
           { label: "View Patients", to: "/admin/patients", color: "var(--purple)" },
           { label: "Appointments", to: "/admin/appointments", color: "var(--amber)" },
         ].map(({ label, to, color }) => (

@@ -62,6 +62,7 @@ export default function ReceptionDashboard() {
           { label: "Register Patient", to: "/reception/patients", color: "var(--teal)" },
           { label: "Book Appointment", to: "/reception/appointments", color: "var(--blue)" },
           { label: "IPD Beds", to: "/reception/ipd", color: "var(--amber)" },
+          { label: "Billing", to: "/reception/billing", color: "var(--green)" },
           { label: "All Patients", to: "/reception/patients", color: "var(--purple)" },
         ].map(({ label, to, color }) => (
           <button key={label} onClick={() => navigate(to)}
