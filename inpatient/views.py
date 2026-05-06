@@ -7,14 +7,16 @@ from rest_framework import filters, generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from patients.models import AdmissionRecord
+from patients.models import AdmissionRecord, VitalSign
 from shared.permissions import IsTenantAdmin, role_required
-from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorRound, NursingRound, Room, Ward
+from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorOrder, DoctorRound, NursingRound, Room, Ward
 from .serializers import (
     BedAssignmentSerializer,
     BedSerializer,
     AdmissionDischargeSerializer,
+    DoctorOrderSerializer,
     DoctorRoundSerializer,
+    IPDVitalSignSerializer,
     BedTransferReadSerializer,
     BedTransferSerializer,
     IPDAdmissionSerializer,
@@ -29,6 +31,8 @@ CanViewIPD = role_required("receptionist", "doctor", "nurse", "billing_staff")
 CanNursing = role_required("nurse", "doctor")
 CanDoctorRound = role_required("receptionist", "doctor", "nurse")
 CanDischarge = role_required("doctor")
+CanOrder = role_required("doctor")
+CanVitals = role_required("doctor", "nurse")
 
 
 class WardListCreateView(generics.ListCreateAPIView):
@@ -199,6 +203,57 @@ class DoctorRoundListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         admission = AdmissionRecord.objects.get(pk=self.kwargs["admission_pk"], status="admitted")
         serializer.save(admission=admission)
+
+
+class IPDVitalSignListCreateView(generics.ListCreateAPIView):
+    serializer_class = IPDVitalSignSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanVitals()]
+        return [CanViewIPD()]
+
+    def get_queryset(self):
+        return VitalSign.objects.filter(admission_id=self.kwargs["admission_pk"]).select_related("recorded_by")
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if self.request.method == "POST":
+            context["admission"] = AdmissionRecord.objects.get(pk=self.kwargs["admission_pk"], status="admitted")
+        return context
+
+
+class DoctorOrderListCreateView(generics.ListCreateAPIView):
+    serializer_class = DoctorOrderSerializer
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    filterset_fields = ["status", "order_type", "priority"]
+    ordering_fields = ["ordered_at", "priority", "status"]
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanOrder()]
+        return [CanViewIPD()]
+
+    def get_queryset(self):
+        return DoctorOrder.objects.filter(admission_id=self.kwargs["admission_pk"]).select_related(
+            "doctor", "completed_by"
+        )
+
+    def perform_create(self, serializer):
+        admission = AdmissionRecord.objects.get(pk=self.kwargs["admission_pk"], status="admitted")
+        serializer.save(admission=admission)
+
+
+class CompleteDoctorOrderView(APIView):
+    permission_classes = [CanVitals]
+
+    def post(self, request, admission_pk, pk):
+        order = DoctorOrder.objects.get(pk=pk, admission_id=admission_pk, status="active")
+        order.status = "completed"
+        order.completed_at = timezone.now()
+        order.completed_by = request.user
+        order.save(update_fields=["status", "completed_at", "completed_by", "updated_at"])
+        return Response(DoctorOrderSerializer(order).data)
 
 
 class DischargeAdmissionView(APIView):

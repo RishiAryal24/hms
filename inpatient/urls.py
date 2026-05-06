@@ -16,5 +16,8 @@ urlpatterns = [
     path("transfers/create/", views.BedTransferView.as_view(), name="ipd-transfer-create"),
     path("admissions/<int:admission_pk>/nursing-rounds/", views.NursingRoundListCreateView.as_view(), name="ipd-nursing-rounds"),
     path("admissions/<int:admission_pk>/doctor-rounds/", views.DoctorRoundListCreateView.as_view(), name="ipd-doctor-rounds"),
+    path("admissions/<int:admission_pk>/vitals/", views.IPDVitalSignListCreateView.as_view(), name="ipd-vitals"),
+    path("admissions/<int:admission_pk>/orders/", views.DoctorOrderListCreateView.as_view(), name="ipd-orders"),
+    path("admissions/<int:admission_pk>/orders/<int:pk>/complete/", views.CompleteDoctorOrderView.as_view(), name="ipd-order-complete"),
     path("admissions/<int:admission_pk>/discharge/", views.DischargeAdmissionView.as_view(), name="ipd-discharge"),
 ]

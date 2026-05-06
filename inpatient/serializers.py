@@ -1,8 +1,8 @@
 from rest_framework import serializers
 
-from patients.models import AdmissionRecord
-from patients.serializers import AdmissionRecordSerializer, PatientListSerializer
-from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorRound, NursingRound, Room, Ward
+from patients.models import AdmissionRecord, VitalSign
+from patients.serializers import AdmissionRecordSerializer, PatientListSerializer, VitalSignSerializer
+from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorOrder, DoctorRound, NursingRound, Room, Ward
 
 
 class WardSerializer(serializers.ModelSerializer):
@@ -204,10 +204,40 @@ class DoctorRoundSerializer(serializers.ModelSerializer):
         return doctor_round
 
 
+class IPDVitalSignSerializer(VitalSignSerializer):
+    class Meta(VitalSignSerializer.Meta):
+        read_only_fields = ["patient", "admission", "recorded_by", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        admission = self.context["admission"]
+        return VitalSign.objects.create(
+            patient=admission.patient,
+            admission=admission,
+            recorded_by=self.context["request"].user,
+            **validated_data,
+        )
+
+
+class DoctorOrderSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.get_full_name", read_only=True)
+    completed_by_name = serializers.CharField(source="completed_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = DoctorOrder
+        fields = "__all__"
+        read_only_fields = ["doctor", "completed_at", "completed_by", "created_at", "updated_at"]
+
+    def create(self, validated_data):
+        validated_data["doctor"] = self.context["request"].user
+        return super().create(validated_data)
+
+
 class IPDAdmissionSerializer(AdmissionRecordSerializer):
     patient_detail = PatientListSerializer(source="patient", read_only=True)
     active_bed = serializers.SerializerMethodField()
     doctor_round_count = serializers.IntegerField(source="doctor_rounds.count", read_only=True)
+    active_order_count = serializers.SerializerMethodField()
+    latest_vital = serializers.SerializerMethodField()
 
     class Meta(AdmissionRecordSerializer.Meta):
         fields = AdmissionRecordSerializer.Meta.fields
@@ -215,3 +245,10 @@ class IPDAdmissionSerializer(AdmissionRecordSerializer):
     def get_active_bed(self, obj):
         assignment = obj.bed_assignments.filter(status="active").select_related("bed", "bed__ward", "bed__room").first()
         return BedAssignmentSerializer(assignment).data if assignment else None
+
+    def get_active_order_count(self, obj):
+        return obj.doctor_orders.filter(status="active").count()
+
+    def get_latest_vital(self, obj):
+        vital = obj.vitals.order_by("-created_at").first()
+        return VitalSignSerializer(vital).data if vital else None

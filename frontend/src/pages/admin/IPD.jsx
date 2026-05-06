@@ -3,13 +3,18 @@ import { getDoctorProfiles } from "../../api/clinical";
 import {
   assignBed,
   createBed,
+  completeDoctorOrder,
   createDoctorRound,
+  createDoctorOrder,
+  createIPDVital,
   createNursingRound,
   createWard,
   dischargeAdmission,
   getActiveAdmissions,
   getBeds,
   getDoctorRounds,
+  getDoctorOrders,
+  getIPDVitals,
   getNursingRounds,
   getWards,
 } from "../../api/inpatient";
@@ -38,7 +43,35 @@ const emptyBed = { ward: "", bed_number: "", status: "available", daily_rate: ""
 const emptyAssign = { admission: "", bed: "", notes: "" };
 const emptyDoctorRound = { admission: "", doctor: "", condition: "", diagnosis: "", treatment_plan: "", notes: "", visit_fee: "" };
 const emptyNursingRound = { admission: "", condition: "", intake_output: "", pain_score: "", notes: "" };
+const emptyVital = {
+  admission: "",
+  temperature_celsius: "",
+  pulse_rate: "",
+  respiratory_rate: "",
+  systolic_bp: "",
+  diastolic_bp: "",
+  oxygen_saturation: "",
+  blood_glucose: "",
+  pain_score: "",
+  notes: "",
+};
+const emptyOrder = { admission: "", order_type: "medication", priority: "routine", title: "", instructions: "" };
 const emptyDischarge = { admission: "", diagnosis_on_discharge: "", discharge_summary: "", generate_bed_charges: true };
+
+const ORDER_TYPES = [
+  { value: "medication", label: "Medication" },
+  { value: "investigation", label: "Investigation" },
+  { value: "nursing", label: "Nursing" },
+  { value: "diet", label: "Diet" },
+  { value: "activity", label: "Activity" },
+  { value: "other", label: "Other" },
+];
+
+const PRIORITIES = [
+  { value: "routine", label: "Routine" },
+  { value: "urgent", label: "Urgent" },
+  { value: "stat", label: "STAT" },
+];
 
 export default function IPD() {
   const { user } = useAuthStore();
@@ -55,6 +88,8 @@ export default function IPD() {
   const [assignModal, setAssignModal] = useState(false);
   const [roundModal, setRoundModal] = useState(false);
   const [nursingModal, setNursingModal] = useState(false);
+  const [vitalModal, setVitalModal] = useState(false);
+  const [orderModal, setOrderModal] = useState(false);
   const [historyModal, setHistoryModal] = useState(false);
   const [dischargeModal, setDischargeModal] = useState(false);
   const [wardForm, setWardForm] = useState(emptyWard);
@@ -62,8 +97,10 @@ export default function IPD() {
   const [assignForm, setAssignForm] = useState(emptyAssign);
   const [roundForm, setRoundForm] = useState(emptyDoctorRound);
   const [nursingForm, setNursingForm] = useState(emptyNursingRound);
+  const [vitalForm, setVitalForm] = useState(emptyVital);
+  const [orderForm, setOrderForm] = useState(emptyOrder);
   const [dischargeForm, setDischargeForm] = useState(emptyDischarge);
-  const [roundHistory, setRoundHistory] = useState({ admission: null, doctors: [], nursing: [] });
+  const [roundHistory, setRoundHistory] = useState({ admission: null, doctors: [], nursing: [], vitals: [], orders: [] });
   const [saving, setSaving] = useState(false);
   const canConfigureBeds = !!(user?.is_tenant_admin || user?.is_superuser);
 
@@ -115,6 +152,8 @@ export default function IPD() {
   const handleBed = (event) => setBedForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleAssign = (event) => setAssignForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleNursing = (event) => setNursingForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleVital = (event) => setVitalForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleOrder = (event) => setOrderForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleDischarge = (event) => {
     const { name, value, type, checked } = event.target;
     setDischargeForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
@@ -226,21 +265,80 @@ export default function IPD() {
     }
   };
 
+  const openVitalModal = (admission) => {
+    setVitalForm({ ...emptyVital, admission: admission.id });
+    setVitalModal(true);
+  };
+
+  const saveVital = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const payload = Object.fromEntries(
+        Object.entries(vitalForm).filter(([key, value]) => key === "admission" || value !== ""),
+      );
+      await createIPDVital(vitalForm.admission, payload);
+      setVitalModal(false);
+      setVitalForm(emptyVital);
+      setSuccess("Vitals recorded.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openOrderModal = (admission) => {
+    setOrderForm({ ...emptyOrder, admission: admission.id });
+    setOrderModal(true);
+  };
+
+  const saveOrder = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await createDoctorOrder(orderForm.admission, orderForm);
+      setOrderModal(false);
+      setOrderForm(emptyOrder);
+      setSuccess("Doctor order created.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openHistoryModal = async (admission) => {
     setHistoryModal(true);
-    setRoundHistory({ admission, doctors: [], nursing: [] });
+    setRoundHistory({ admission, doctors: [], nursing: [], vitals: [], orders: [] });
     try {
-      const [doctorRes, nursingRes] = await Promise.all([
+      const [doctorRes, nursingRes, vitalRes, orderRes] = await Promise.all([
         getDoctorRounds(admission.id),
         getNursingRounds(admission.id),
+        getIPDVitals(admission.id),
+        getDoctorOrders(admission.id),
       ]);
       setRoundHistory({
         admission,
         doctors: doctorRes.data.results || doctorRes.data,
         nursing: nursingRes.data.results || nursingRes.data,
+        vitals: vitalRes.data.results || vitalRes.data,
+        orders: orderRes.data.results || orderRes.data,
       });
     } catch {
       setError("Unable to load round history.");
+    }
+  };
+
+  const markOrderComplete = async (order) => {
+    if (!roundHistory.admission) return;
+    try {
+      await completeDoctorOrder(roundHistory.admission.id, order.id);
+      openHistoryModal(roundHistory.admission);
+    } catch {
+      setError("Unable to complete order.");
     }
   };
 
@@ -299,6 +397,8 @@ export default function IPD() {
               admissions={admissions}
               onDoctorRound={openRoundModal}
               onNursingRound={openNursingModal}
+              onVitals={openVitalModal}
+              onOrder={openOrderModal}
               onHistory={openHistoryModal}
               onDischarge={openDischargeModal}
             />
@@ -368,10 +468,43 @@ export default function IPD() {
         </div>
       </Modal>
 
+      <Modal open={vitalModal} onClose={() => setVitalModal(false)} title="Record Vitals" width={640}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+          <Field label="Temp C" name="temperature_celsius" value={vitalForm.temperature_celsius} onChange={handleVital} type="number" />
+          <Field label="Pulse" name="pulse_rate" value={vitalForm.pulse_rate} onChange={handleVital} type="number" />
+          <Field label="Resp. Rate" name="respiratory_rate" value={vitalForm.respiratory_rate} onChange={handleVital} type="number" />
+          <Field label="Systolic BP" name="systolic_bp" value={vitalForm.systolic_bp} onChange={handleVital} type="number" />
+          <Field label="Diastolic BP" name="diastolic_bp" value={vitalForm.diastolic_bp} onChange={handleVital} type="number" />
+          <Field label="SpO2" name="oxygen_saturation" value={vitalForm.oxygen_saturation} onChange={handleVital} type="number" />
+          <Field label="Blood Glucose" name="blood_glucose" value={vitalForm.blood_glucose} onChange={handleVital} type="number" />
+          <Field label="Pain Score" name="pain_score" value={vitalForm.pain_score} onChange={handleVital} type="number" />
+        </div>
+        <Field label="Notes" name="notes" value={vitalForm.notes} onChange={handleVital} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setVitalModal(false)}>Cancel</Btn>
+          <Btn onClick={saveVital} disabled={saving}>Save Vitals</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={orderModal} onClose={() => setOrderModal(false)} title="Doctor Order" width={600}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Type" name="order_type" value={orderForm.order_type} onChange={handleOrder} options={ORDER_TYPES} />
+          <Field label="Priority" name="priority" value={orderForm.priority} onChange={handleOrder} options={PRIORITIES} />
+        </div>
+        <Field label="Order" name="title" value={orderForm.title} onChange={handleOrder} required />
+        <Field label="Instructions" name="instructions" value={orderForm.instructions} onChange={handleOrder} required />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setOrderModal(false)}>Cancel</Btn>
+          <Btn onClick={saveOrder} disabled={saving || !orderForm.title || !orderForm.instructions}>Create Order</Btn>
+        </div>
+      </Modal>
+
       <Modal open={historyModal} onClose={() => setHistoryModal(false)} title={`Rounds - ${roundHistory.admission?.admission_number || ""}`} width={760}>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           <RoundList title="Doctor Rounds" items={roundHistory.doctors} kind="doctor" />
           <RoundList title="Nursing Rounds" items={roundHistory.nursing} kind="nursing" />
+          <VitalList vitals={roundHistory.vitals} />
+          <OrderList orders={roundHistory.orders} onComplete={markOrderComplete} />
         </div>
       </Modal>
 
@@ -423,25 +556,27 @@ function BedsTable({ beds }) {
   );
 }
 
-function AdmissionsTable({ admissions, onDoctorRound, onNursingRound, onHistory, onDischarge }) {
+function AdmissionsTable({ admissions, onDoctorRound, onNursingRound, onVitals, onOrder, onHistory, onDischarge }) {
   if (!admissions.length) return <Empty icon="IPD" message="No active admissions" />;
   return (
     <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr>{["Admission", "Patient", "Doctor", "Department", "Bed", "Since", "Actions"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <thead><tr>{["Admission", "Patient", "Doctor", "Bed", "Latest Vitals", "Orders", "Actions"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
         <tbody>
           {admissions.map((admission) => (
             <tr key={admission.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
               <Td>{admission.admission_number}</Td>
               <Td>{admission.patient_detail?.full_name || "-"}</Td>
               <Td>{admission.admitting_doctor_name || "-"}</Td>
-              <Td>{admission.department || "-"}</Td>
               <Td>{admission.active_bed?.bed_label || "Unassigned"}</Td>
-              <Td>{new Date(admission.admission_date).toLocaleDateString()}</Td>
+              <Td><LatestVitals vital={admission.latest_vital} /></Td>
+              <Td>{admission.active_order_count || 0} active</Td>
               <Td>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                   <Btn size="sm" variant="secondary" onClick={() => onDoctorRound(admission)}>Doctor</Btn>
                   <Btn size="sm" variant="ghost" onClick={() => onNursingRound(admission)}>Nursing</Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => onVitals(admission)}>Vitals</Btn>
+                  <Btn size="sm" variant="ghost" onClick={() => onOrder(admission)}>Order</Btn>
                   <Btn size="sm" variant="ghost" onClick={() => onHistory(admission)}>History</Btn>
                   <Btn size="sm" onClick={() => onDischarge(admission)}>Discharge</Btn>
                 </div>
@@ -476,6 +611,19 @@ function WardsTable({ wards }) {
   );
 }
 
+function LatestVitals({ vital }) {
+  if (!vital) return <span>-</span>;
+  const bp = vital.blood_pressure || (vital.systolic_bp && vital.diastolic_bp ? `${vital.systolic_bp}/${vital.diastolic_bp}` : "-");
+  return (
+    <div>
+      <div>{bp} / SpO2 {vital.oxygen_saturation || "-"}</div>
+      <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
+        T {vital.temperature_celsius || "-"} / P {vital.pulse_rate || "-"}
+      </div>
+    </div>
+  );
+}
+
 function RoundList({ title, items, kind }) {
   return (
     <div>
@@ -494,6 +642,57 @@ function RoundList({ title, items, kind }) {
               {kind === "doctor" && item.invoice_number && (
                 <div style={{ color: "var(--green)", fontSize: 12, marginTop: 6 }}>
                   {item.invoice_number} / Rs. {item.invoice_line_total}
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VitalList({ vitals }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 10 }}>Vitals</div>
+      {!vitals.length ? <Empty icon="VT" message="No vitals recorded" /> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {vitals.slice(0, 6).map((vital) => (
+            <Card key={`vital-${vital.id}`}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontWeight: 700 }}>{vital.blood_pressure || "Vitals"}</div>
+                <div style={{ color: "var(--text-dim)", fontSize: 11 }}>{new Date(vital.created_at).toLocaleString()}</div>
+              </div>
+              <div style={{ color: "var(--text-mute)", fontSize: 12, marginTop: 6 }}>
+                T {vital.temperature_celsius || "-"} / P {vital.pulse_rate || "-"} / SpO2 {vital.oxygen_saturation || "-"} / Pain {vital.pain_score ?? "-"}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderList({ orders, onComplete }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 800, marginBottom: 10 }}>Doctor Orders</div>
+      {!orders.length ? <Empty icon="OR" message="No orders yet" /> : (
+        <div style={{ display: "grid", gap: 10 }}>
+          {orders.map((order) => (
+            <Card key={`order-${order.id}`}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <div style={{ fontWeight: 700 }}>{order.title}</div>
+                <Badge label={order.status} color={order.status === "active" ? "var(--blue)" : "var(--green)"} />
+              </div>
+              <div style={{ color: "var(--text-mute)", fontSize: 12, marginTop: 6 }}>
+                {order.order_type} / {order.priority}: {order.instructions}
+              </div>
+              {order.status === "active" && (
+                <div style={{ marginTop: 10 }}>
+                  <Btn size="sm" variant="secondary" onClick={() => onComplete(order)}>Complete</Btn>
                 </div>
               )}
             </Card>

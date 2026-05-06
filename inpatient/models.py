@@ -181,3 +181,52 @@ class DoctorRound(TimeStampedModel):
 
     def __str__(self):
         return f"Doctor round {self.admission.admission_number} @ {self.round_time:%Y-%m-%d %H:%M}"
+
+
+class DoctorOrder(TimeStampedModel):
+    class OrderType(models.TextChoices):
+        MEDICATION = "medication", "Medication"
+        INVESTIGATION = "investigation", "Investigation"
+        NURSING = "nursing", "Nursing"
+        DIET = "diet", "Diet"
+        ACTIVITY = "activity", "Activity"
+        OTHER = "other", "Other"
+
+    class Priority(models.TextChoices):
+        ROUTINE = "routine", "Routine"
+        URGENT = "urgent", "Urgent"
+        STAT = "stat", "STAT"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    admission = models.ForeignKey(AdmissionRecord, on_delete=models.CASCADE, related_name="doctor_orders")
+    doctor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="ipd_doctor_orders",
+        limit_choices_to={"role__name": "doctor"},
+    )
+    order_type = models.CharField(max_length=30, choices=OrderType.choices, default=OrderType.MEDICATION)
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.ROUTINE)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.ACTIVE)
+    title = models.CharField(max_length=200)
+    instructions = models.TextField()
+    ordered_at = models.DateTimeField(default=timezone.now)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    completed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="completed_ipd_orders",
+    )
+
+    class Meta:
+        ordering = ["status", "-ordered_at"]
+
+    def __str__(self):
+        return f"{self.get_order_type_display()} order - {self.admission.admission_number}"
