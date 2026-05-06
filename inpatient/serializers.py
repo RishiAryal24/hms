@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from patients.models import AdmissionRecord
 from patients.serializers import AdmissionRecordSerializer, PatientListSerializer
-from .models import Bed, BedAssignment, BedStatus, BedTransfer, NursingRound, Room, Ward
+from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorRound, NursingRound, Room, Ward
 
 
 class WardSerializer(serializers.ModelSerializer):
@@ -144,9 +144,64 @@ class NursingRoundSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class DoctorRoundSerializer(serializers.ModelSerializer):
+    admission_number = serializers.CharField(source="admission.admission_number", read_only=True)
+    doctor_name = serializers.CharField(source="doctor.get_full_name", read_only=True)
+    invoice_number = serializers.CharField(source="invoice_line.invoice.invoice_number", read_only=True)
+    invoice_line_total = serializers.DecimalField(source="invoice_line.line_total", max_digits=12, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = DoctorRound
+        fields = "__all__"
+        read_only_fields = ["invoice_line", "created_at", "updated_at"]
+
+    def validate_doctor(self, doctor):
+        if doctor.role_name != "doctor":
+            raise serializers.ValidationError("Selected user must have the doctor role.")
+        return doctor
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        admission = validated_data["admission"]
+        doctor = validated_data.get("doctor")
+        if getattr(request.user, "role_name", None) == "doctor":
+            doctor = request.user
+        if not doctor:
+            raise serializers.ValidationError({"doctor": "Doctor is required."})
+        validated_data["doctor"] = doctor
+        profile = getattr(doctor, "doctor_profile", None)
+
+        if not validated_data.get("visit_fee") and profile:
+            validated_data["visit_fee"] = profile.consultation_fee
+
+        doctor_round = DoctorRound.objects.create(**validated_data)
+
+        if doctor_round.visit_fee:
+            from billing.models import ChargeCategory
+            from billing.services import add_billable_line
+
+            doctor_name = doctor.get_full_name() or doctor.username
+            line = add_billable_line(
+                patient=admission.patient,
+                admission=admission,
+                created_by=request.user,
+                description=f"IPD doctor round - Dr. {doctor_name}",
+                category=ChargeCategory.IPD,
+                unit_price=doctor_round.visit_fee,
+                source_module="inpatient.doctor_round",
+                source_id=doctor_round.id,
+            )
+            if line:
+                doctor_round.invoice_line = line
+                doctor_round.save(update_fields=["invoice_line", "updated_at"])
+
+        return doctor_round
+
+
 class IPDAdmissionSerializer(AdmissionRecordSerializer):
     patient_detail = PatientListSerializer(source="patient", read_only=True)
     active_bed = serializers.SerializerMethodField()
+    doctor_round_count = serializers.IntegerField(source="doctor_rounds.count", read_only=True)
 
     class Meta(AdmissionRecordSerializer.Meta):
         fields = AdmissionRecordSerializer.Meta.fields

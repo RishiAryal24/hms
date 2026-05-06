@@ -7,10 +7,11 @@ from rest_framework.views import APIView
 
 from patients.models import AdmissionRecord
 from shared.permissions import IsTenantAdmin, role_required
-from .models import Bed, BedAssignment, BedStatus, BedTransfer, NursingRound, Room, Ward
+from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorRound, NursingRound, Room, Ward
 from .serializers import (
     BedAssignmentSerializer,
     BedSerializer,
+    DoctorRoundSerializer,
     BedTransferReadSerializer,
     BedTransferSerializer,
     IPDAdmissionSerializer,
@@ -23,6 +24,7 @@ from .serializers import (
 CanManageBeds = role_required("receptionist", "nurse")
 CanViewIPD = role_required("receptionist", "doctor", "nurse", "billing_staff")
 CanNursing = role_required("nurse", "doctor")
+CanDoctorRound = role_required("receptionist", "doctor", "nurse")
 
 
 class WardListCreateView(generics.ListCreateAPIView):
@@ -171,6 +173,24 @@ class NursingRoundListCreateView(generics.ListCreateAPIView):
         return NursingRound.objects.select_related("admission", "nurse").filter(
             admission_id=self.kwargs["admission_pk"]
         )
+
+    def perform_create(self, serializer):
+        admission = AdmissionRecord.objects.get(pk=self.kwargs["admission_pk"], status="admitted")
+        serializer.save(admission=admission)
+
+
+class DoctorRoundListCreateView(generics.ListCreateAPIView):
+    serializer_class = DoctorRoundSerializer
+
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [CanDoctorRound()]
+        return [CanViewIPD()]
+
+    def get_queryset(self):
+        return DoctorRound.objects.select_related(
+            "admission", "doctor", "invoice_line", "invoice_line__invoice"
+        ).filter(admission_id=self.kwargs["admission_pk"])
 
     def perform_create(self, serializer):
         admission = AdmissionRecord.objects.get(pk=self.kwargs["admission_pk"], status="admitted")

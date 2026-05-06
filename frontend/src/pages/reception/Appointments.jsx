@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getAppointments, bookAppointment, cancelAppointment, checkAvailability } from "../../api/appointments";
 import { getPatients } from "../../api/patients";
-import { getStaff } from "../../api/auth";
+import { getDoctorProfiles } from "../../api/clinical";
 import { Badge, Btn, Modal, Field, Spinner, Empty, Alert, Card } from "../../components/ui";
 
 const STATUS_COLOR = { scheduled:"var(--blue)", completed:"var(--green)", cancelled:"var(--red)", no_show:"var(--amber)" };
@@ -38,11 +38,19 @@ export default function Appointments() {
 
   useEffect(() => {
     getPatients({ page_size: 200 }).then(r => setPatients(r.data.results || r.data));
-    getStaff({ role: "doctor" }).then(r => setDoctors(r.data.results || r.data));
+    getDoctorProfiles({ is_available: true }).then(r => setDoctors(r.data.results || r.data));
   }, []);
 
   const handle = (e) => {
-    setForm(p => ({ ...p, [e.target.name]: e.target.value }));
+    const next = { ...form, [e.target.name]: e.target.value };
+    if (e.target.name === "doctor") {
+      const profile = doctors.find(d => String(d.user) === String(e.target.value));
+      if (profile) {
+        next.consultation_fee = profile.consultation_fee || "";
+        next.department = profile.department || next.department;
+      }
+    }
+    setForm(next);
     if ((e.target.name === "doctor" || e.target.name === "appointment_date") ) {
       setAvail(null);
     }
@@ -86,7 +94,10 @@ export default function Appointments() {
   };
 
   const patientOpts = patients.map(p => ({ value: p.id, label: `${p.full_name} (${p.patient_id})` }));
-  const doctorOpts  = doctors.map(d => ({ value: d.id, label: d.full_name || d.username }));
+  const doctorOpts  = doctors.map(d => ({
+    value: d.user,
+    label: `${d.full_name || d.username} - ${d.specialty}${d.consultation_fee ? ` / Rs. ${d.consultation_fee}` : ""}`,
+  }));
 
   return (
     <div className="page-enter" style={{ padding: 28 }}>

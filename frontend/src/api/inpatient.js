@@ -19,3 +19,5 @@ export const transferBed = (data) => api.post("/inpatient/transfers/create/", da
 export const getBedTransfers = (params) => api.get("/inpatient/transfers/", { params });
 export const getNursingRounds = (admissionId) => api.get(`/inpatient/admissions/${admissionId}/nursing-rounds/`);
 export const createNursingRound = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/nursing-rounds/`, data);
+export const getDoctorRounds = (admissionId) => api.get(`/inpatient/admissions/${admissionId}/doctor-rounds/`);
+export const createDoctorRound = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/doctor-rounds/`, data);

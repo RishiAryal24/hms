@@ -151,3 +151,33 @@ class NursingRound(TimeStampedModel):
 
     def __str__(self):
         return f"Nursing round {self.admission.admission_number} @ {self.round_time:%Y-%m-%d %H:%M}"
+
+
+class DoctorRound(TimeStampedModel):
+    admission = models.ForeignKey(AdmissionRecord, on_delete=models.CASCADE, related_name="doctor_rounds")
+    doctor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="ipd_doctor_rounds",
+        limit_choices_to={"role__name": "doctor"},
+    )
+    round_time = models.DateTimeField(default=timezone.now)
+    condition = models.CharField(max_length=150, blank=True)
+    diagnosis = models.TextField(blank=True)
+    treatment_plan = models.TextField(blank=True)
+    notes = models.TextField()
+    visit_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    invoice_line = models.ForeignKey(
+        "billing.InvoiceLine",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doctor_rounds",
+    )
+
+    class Meta:
+        ordering = ["-round_time"]
+
+    def __str__(self):
+        return f"Doctor round {self.admission.admission_number} @ {self.round_time:%Y-%m-%d %H:%M}"

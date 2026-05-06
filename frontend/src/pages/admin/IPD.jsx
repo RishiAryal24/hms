@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { assignBed, createBed, createWard, getActiveAdmissions, getBeds, getWards } from "../../api/inpatient";
+import { getDoctorProfiles } from "../../api/clinical";
+import { assignBed, createBed, createDoctorRound, createWard, getActiveAdmissions, getBeds, getWards } from "../../api/inpatient";
 import { Alert, Badge, Btn, Card, Empty, Field, Modal, Spinner, Tabs } from "../../components/ui";
 import useAuthStore from "../../store/authStore";
 
@@ -23,6 +24,7 @@ const STATUS_COLOR = {
 const emptyWard = { name: "", ward_type: "general", department: "", floor: "", is_active: true };
 const emptyBed = { ward: "", bed_number: "", status: "available", daily_rate: "", notes: "" };
 const emptyAssign = { admission: "", bed: "", notes: "" };
+const emptyDoctorRound = { admission: "", doctor: "", condition: "", diagnosis: "", treatment_plan: "", notes: "", visit_fee: "" };
 
 export default function IPD() {
   const { user } = useAuthStore();
@@ -30,15 +32,18 @@ export default function IPD() {
   const [wards, setWards] = useState([]);
   const [beds, setBeds] = useState([]);
   const [admissions, setAdmissions] = useState([]);
+  const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [wardModal, setWardModal] = useState(false);
   const [bedModal, setBedModal] = useState(false);
   const [assignModal, setAssignModal] = useState(false);
+  const [roundModal, setRoundModal] = useState(false);
   const [wardForm, setWardForm] = useState(emptyWard);
   const [bedForm, setBedForm] = useState(emptyBed);
   const [assignForm, setAssignForm] = useState(emptyAssign);
+  const [roundForm, setRoundForm] = useState(emptyDoctorRound);
   const [saving, setSaving] = useState(false);
   const canConfigureBeds = !!(user?.is_tenant_admin || user?.is_superuser);
 
@@ -46,14 +51,16 @@ export default function IPD() {
     setLoading(true);
     setError("");
     try {
-      const [wardRes, bedRes, admissionRes] = await Promise.all([
+      const [wardRes, bedRes, admissionRes, doctorRes] = await Promise.all([
         getWards(),
         getBeds(),
         getActiveAdmissions(),
+        getDoctorProfiles({ is_available: true }),
       ]);
       setWards(wardRes.data.results || wardRes.data);
       setBeds(bedRes.data.results || bedRes.data);
       setAdmissions(admissionRes.data.results || admissionRes.data);
+      setDoctors(doctorRes.data.results || doctorRes.data);
     } catch {
       setError("Unable to load IPD data.");
     } finally {
@@ -72,6 +79,10 @@ export default function IPD() {
     value: admission.id,
     label: `${admission.admission_number} - ${admission.patient_detail?.full_name || "Patient"}`,
   }));
+  const doctorOptions = doctors.map((doctor) => ({
+    value: doctor.user,
+    label: `${doctor.full_name || doctor.username} - ${doctor.specialty}`,
+  }));
 
   const stats = useMemo(() => ({
     total: beds.length,
@@ -83,6 +94,14 @@ export default function IPD() {
   const handleWard = (event) => setWardForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleBed = (event) => setBedForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleAssign = (event) => setAssignForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleRound = (event) => {
+    const next = { ...roundForm, [event.target.name]: event.target.value };
+    if (event.target.name === "doctor") {
+      const profile = doctors.find((doctor) => String(doctor.user) === String(event.target.value));
+      if (profile) next.visit_fee = profile.consultation_fee || "";
+    }
+    setRoundForm(next);
+  };
 
   const saveWard = async () => {
     setSaving(true);
@@ -133,6 +152,34 @@ export default function IPD() {
     }
   };
 
+  const openRoundModal = (admission) => {
+    const profile = doctors.find((doctor) => String(doctor.user) === String(admission.admitting_doctor));
+    setRoundForm({
+      ...emptyDoctorRound,
+      admission: admission.id,
+      doctor: profile?.user || "",
+      visit_fee: profile?.consultation_fee || "",
+    });
+    setRoundModal(true);
+  };
+
+  const saveDoctorRound = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const payload = { ...roundForm, visit_fee: roundForm.visit_fee || "0" };
+      await createDoctorRound(roundForm.admission, payload);
+      setRoundModal(false);
+      setRoundForm(emptyDoctorRound);
+      setSuccess("Doctor round recorded and billing charge added.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="page-enter" style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
@@ -162,7 +209,7 @@ export default function IPD() {
       {loading ? <Spinner /> : (
         <>
           {tab === "beds" && <BedsTable beds={beds} />}
-          {tab === "admissions" && <AdmissionsTable admissions={admissions} />}
+          {tab === "admissions" && <AdmissionsTable admissions={admissions} onDoctorRound={openRoundModal} />}
           {tab === "wards" && <WardsTable wards={wards} />}
         </>
       )}
@@ -196,6 +243,22 @@ export default function IPD() {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Btn variant="secondary" onClick={() => setAssignModal(false)}>Cancel</Btn>
           <Btn onClick={saveAssignment} disabled={saving || !assignForm.admission || !assignForm.bed}>Assign</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={roundModal} onClose={() => setRoundModal(false)} title="Doctor Round" width={600}>
+        <Field label="Doctor" name="doctor" value={roundForm.doctor} onChange={handleRound} options={doctorOptions} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Condition" name="condition" value={roundForm.condition} onChange={handleRound} />
+          <Field label="Visit Fee" name="visit_fee" value={roundForm.visit_fee} onChange={handleRound} type="number" />
+        </div>
+        <Field label="Diagnosis" name="diagnosis" value={roundForm.diagnosis} onChange={handleRound} />
+        <Field label="Treatment Plan" name="treatment_plan" value={roundForm.treatment_plan} onChange={handleRound} />
+        <Field label="Notes" name="notes" value={roundForm.notes} onChange={handleRound} required />
+        <Alert type="info" message="Saving this round adds the visit fee to the patient's open IPD invoice." />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setRoundModal(false)}>Cancel</Btn>
+          <Btn onClick={saveDoctorRound} disabled={saving || !roundForm.doctor || !roundForm.notes}>Save Round</Btn>
         </div>
       </Modal>
     </div>
@@ -233,12 +296,12 @@ function BedsTable({ beds }) {
   );
 }
 
-function AdmissionsTable({ admissions }) {
+function AdmissionsTable({ admissions, onDoctorRound }) {
   if (!admissions.length) return <Empty icon="IPD" message="No active admissions" />;
   return (
     <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr>{["Admission", "Patient", "Doctor", "Department", "Bed", "Since"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <thead><tr>{["Admission", "Patient", "Doctor", "Department", "Bed", "Since", "Actions"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
         <tbody>
           {admissions.map((admission) => (
             <tr key={admission.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
@@ -248,6 +311,7 @@ function AdmissionsTable({ admissions }) {
               <Td>{admission.department || "-"}</Td>
               <Td>{admission.active_bed?.bed_label || "Unassigned"}</Td>
               <Td>{new Date(admission.admission_date).toLocaleDateString()}</Td>
+              <Td><Btn size="sm" variant="secondary" onClick={() => onDoctorRound(admission)}>Doctor Round</Btn></Td>
             </tr>
           ))}
         </tbody>

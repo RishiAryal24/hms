@@ -133,12 +133,35 @@ class AppointmentCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request     = self.context['request']
+        doctor = validated_data.get('doctor')
+        profile = getattr(doctor, 'doctor_profile', None)
+        if profile:
+            if not validated_data.get('consultation_fee'):
+                validated_data['consultation_fee'] = profile.consultation_fee
+            if not validated_data.get('department'):
+                validated_data['department'] = profile.department
+
         appointment = Appointment.objects.create(
             booked_by=request.user,
             **validated_data
         )
         # Auto-create queue entry
         AppointmentQueue.objects.create(appointment=appointment)
+
+        if appointment.consultation_fee:
+            from billing.models import ChargeCategory
+            from billing.services import add_billable_line
+
+            doctor_name = appointment.doctor.get_full_name() or appointment.doctor.username
+            add_billable_line(
+                patient=appointment.patient,
+                created_by=request.user,
+                description=f"OPD consultation - Dr. {doctor_name}",
+                category=ChargeCategory.CONSULTATION,
+                unit_price=appointment.consultation_fee,
+                source_module="appointments",
+                source_id=appointment.id,
+            )
         return appointment
 
 
