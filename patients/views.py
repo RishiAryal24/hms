@@ -29,7 +29,7 @@ from .filters import PatientFilter
 # ---------------------------------------------------------------------------
 # Permission aliases
 # ---------------------------------------------------------------------------
-CanRegisterPatient = role_required('receptionist')
+CanRegisterPatient = role_required('receptionist', 'hospital_admin')
 CanViewPatient     = role_required('receptionist', 'doctor', 'nurse',
                                    'pharmacist', 'lab_technician', 'billing_staff')
 CanWriteClinical   = role_required('doctor')
