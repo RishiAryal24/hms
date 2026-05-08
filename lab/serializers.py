@@ -53,13 +53,20 @@ class LabOrderCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = LabOrder
-        fields = ["patient", "admission", "priority", "clinical_notes", "tests"]
+        fields = ["patient", "admission", "source_order", "priority", "clinical_notes", "tests"]
 
     def validate(self, attrs):
         admission = attrs.get("admission")
         patient = attrs.get("patient")
+        source_order = attrs.get("source_order")
         if admission and admission.patient_id != patient.id:
             raise serializers.ValidationError({"admission": "Admission must belong to the selected patient."})
+        if source_order and source_order.order_type != "investigation":
+            raise serializers.ValidationError({"source_order": "Only investigation doctor orders can create lab orders."})
+        if source_order and LabOrder.objects.filter(source_order=source_order).exists():
+            raise serializers.ValidationError({"source_order": "This doctor order already has a lab order."})
+        if source_order and source_order.admission.patient_id != patient.id:
+            raise serializers.ValidationError({"source_order": "Doctor order must belong to the selected patient."})
         if not any(test.price > 0 for test in attrs.get("tests", [])):
             raise serializers.ValidationError({"tests": "At least one selected lab test must have a price greater than zero to create billing."})
         return attrs

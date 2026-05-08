@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDoctorProfiles } from "../../api/clinical";
+import { createLabOrder, getLabTests } from "../../api/lab";
 import {
   assignBed,
   createBed,
@@ -56,6 +57,7 @@ const emptyVital = {
   notes: "",
 };
 const emptyOrder = { admission: "", order_type: "medication", priority: "routine", title: "", instructions: "" };
+const emptyLabFromOrder = { source_order: "", patient: "", admission: "", priority: "routine", clinical_notes: "", tests: [] };
 const emptyDischarge = { admission: "", diagnosis_on_discharge: "", discharge_summary: "", generate_bed_charges: true };
 
 const ORDER_TYPES = [
@@ -80,6 +82,7 @@ export default function IPD() {
   const [beds, setBeds] = useState([]);
   const [admissions, setAdmissions] = useState([]);
   const [doctors, setDoctors] = useState([]);
+  const [labTests, setLabTests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -90,6 +93,7 @@ export default function IPD() {
   const [nursingModal, setNursingModal] = useState(false);
   const [vitalModal, setVitalModal] = useState(false);
   const [orderModal, setOrderModal] = useState(false);
+  const [labOrderModal, setLabOrderModal] = useState(false);
   const [historyModal, setHistoryModal] = useState(false);
   const [dischargeModal, setDischargeModal] = useState(false);
   const [wardForm, setWardForm] = useState(emptyWard);
@@ -99,6 +103,7 @@ export default function IPD() {
   const [nursingForm, setNursingForm] = useState(emptyNursingRound);
   const [vitalForm, setVitalForm] = useState(emptyVital);
   const [orderForm, setOrderForm] = useState(emptyOrder);
+  const [labOrderForm, setLabOrderForm] = useState(emptyLabFromOrder);
   const [dischargeForm, setDischargeForm] = useState(emptyDischarge);
   const [roundHistory, setRoundHistory] = useState({ admission: null, doctors: [], nursing: [], vitals: [], orders: [] });
   const [saving, setSaving] = useState(false);
@@ -108,16 +113,18 @@ export default function IPD() {
     setLoading(true);
     setError("");
     try {
-      const [wardRes, bedRes, admissionRes, doctorRes] = await Promise.all([
+      const [wardRes, bedRes, admissionRes, doctorRes, labTestRes] = await Promise.all([
         getWards(),
         getBeds(),
         getActiveAdmissions(),
         getDoctorProfiles({ is_available: true }),
+        getLabTests({ is_active: true }),
       ]);
       setWards(wardRes.data.results || wardRes.data);
       setBeds(bedRes.data.results || bedRes.data);
       setAdmissions(admissionRes.data.results || admissionRes.data);
       setDoctors(doctorRes.data.results || doctorRes.data);
+      setLabTests(labTestRes.data.results || labTestRes.data);
     } catch {
       setError("Unable to load IPD data.");
     } finally {
@@ -140,6 +147,10 @@ export default function IPD() {
     value: doctor.user,
     label: `${doctor.full_name || doctor.username} - ${doctor.specialty}`,
   }));
+  const labTestOptions = labTests.map((test) => ({
+    value: test.id,
+    label: `${test.code} - ${test.name} / Rs. ${test.price}`,
+  }));
 
   const stats = useMemo(() => ({
     total: beds.length,
@@ -154,6 +165,14 @@ export default function IPD() {
   const handleNursing = (event) => setNursingForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleVital = (event) => setVitalForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleOrder = (event) => setOrderForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleLabOrder = (event) => {
+    if (event.target.name === "tests") {
+      const values = Array.from(event.target.selectedOptions).map((option) => option.value);
+      setLabOrderForm((current) => ({ ...current, tests: values }));
+      return;
+    }
+    setLabOrderForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  };
   const handleDischarge = (event) => {
     const { name, value, type, checked } = event.target;
     setDischargeForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
@@ -342,6 +361,35 @@ export default function IPD() {
     }
   };
 
+  const openLabOrderModal = (order) => {
+    if (!roundHistory.admission) return;
+    setLabOrderForm({
+      ...emptyLabFromOrder,
+      source_order: order.id,
+      patient: roundHistory.admission.patient,
+      admission: roundHistory.admission.id,
+      priority: order.priority || "routine",
+      clinical_notes: `${order.title}: ${order.instructions}`,
+    });
+    setLabOrderModal(true);
+  };
+
+  const saveLabOrderFromDoctorOrder = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await createLabOrder(labOrderForm);
+      setLabOrderModal(false);
+      setLabOrderForm(emptyLabFromOrder);
+      setSuccess("Lab order created from investigation order.");
+      if (roundHistory.admission) openHistoryModal(roundHistory.admission);
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openDischargeModal = (admission) => {
     setDischargeForm({ ...emptyDischarge, admission: admission.id });
     setDischargeModal(true);
@@ -504,7 +552,23 @@ export default function IPD() {
           <RoundList title="Doctor Rounds" items={roundHistory.doctors} kind="doctor" />
           <RoundList title="Nursing Rounds" items={roundHistory.nursing} kind="nursing" />
           <VitalList vitals={roundHistory.vitals} />
-          <OrderList orders={roundHistory.orders} onComplete={markOrderComplete} />
+          <OrderList orders={roundHistory.orders} onComplete={markOrderComplete} onLabOrder={openLabOrderModal} />
+        </div>
+      </Modal>
+
+      <Modal open={labOrderModal} onClose={() => setLabOrderModal(false)} title="Create Lab Order" width={620}>
+        <Field label="Priority" name="priority" value={labOrderForm.priority} onChange={handleLabOrder} options={PRIORITIES} />
+        <div className="field">
+          <label className="field-label">Lab Tests <span className="required">*</span></label>
+          <select name="tests" value={labOrderForm.tests} onChange={handleLabOrder} className="field-control" multiple style={{ minHeight: 150 }}>
+            {labTestOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </div>
+        <Field label="Clinical Notes" name="clinical_notes" value={labOrderForm.clinical_notes} onChange={handleLabOrder} />
+        <Alert type="info" message="Creating this lab order will add selected lab test charges to Billing." />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setLabOrderModal(false)}>Cancel</Btn>
+          <Btn onClick={saveLabOrderFromDoctorOrder} disabled={saving || labOrderForm.tests.length === 0}>Create Lab Order</Btn>
         </div>
       </Modal>
 
@@ -675,7 +739,7 @@ function VitalList({ vitals }) {
   );
 }
 
-function OrderList({ orders, onComplete }) {
+function OrderList({ orders, onComplete, onLabOrder }) {
   return (
     <div>
       <div style={{ fontWeight: 800, marginBottom: 10 }}>Doctor Orders</div>
@@ -691,7 +755,11 @@ function OrderList({ orders, onComplete }) {
                 {order.order_type} / {order.priority}: {order.instructions}
               </div>
               {order.status === "active" && (
-                <div style={{ marginTop: 10 }}>
+                <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {order.order_type === "investigation" && !order.lab_order_id && (
+                    <Btn size="sm" onClick={() => onLabOrder(order)}>Send to Lab</Btn>
+                  )}
+                  {order.lab_order_number && <Badge label={order.lab_order_number} color="var(--purple)" />}
                   <Btn size="sm" variant="secondary" onClick={() => onComplete(order)}>Complete</Btn>
                 </div>
               )}

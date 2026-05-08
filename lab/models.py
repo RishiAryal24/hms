@@ -55,6 +55,13 @@ class LabOrder(TimeStampedModel):
         default="routine",
     )
     clinical_notes = models.TextField(blank=True)
+    source_order = models.OneToOneField(
+        "inpatient.DoctorOrder",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lab_order",
+    )
     ordered_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="ordered_lab_tests")
     collected_at = models.DateTimeField(null=True, blank=True)
     collected_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="collected_lab_samples")

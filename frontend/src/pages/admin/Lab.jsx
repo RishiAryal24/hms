@@ -184,6 +184,68 @@ export default function Lab() {
     }
   };
 
+  const printReport = (order) => {
+    const rows = (order.items || []).map((item) => `
+      <tr>
+        <td>${item.test_detail?.name || "-"}</td>
+        <td>${item.result_value || "-"}</td>
+        <td>${item.test_detail?.unit || ""}</td>
+        <td>${item.test_detail?.normal_range || "-"}</td>
+        <td>${item.is_abnormal ? "Abnormal" : "Normal"}</td>
+      </tr>
+      ${item.result_notes ? `<tr><td colspan="5"><strong>Note:</strong> ${item.result_notes}</td></tr>` : ""}
+    `).join("");
+    const popup = window.open("", "_blank", "width=900,height=720");
+    popup.document.write(`
+      <html>
+        <head>
+          <title>${order.order_number} Lab Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 28px; color: #111827; }
+            h1 { margin: 0 0 4px; font-size: 24px; }
+            .muted { color: #6b7280; font-size: 13px; }
+            .top { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+            .meta { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 20px; margin: 18px 0; font-size: 13px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+            th, td { border-bottom: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 13px; }
+            th { color: #6b7280; text-transform: uppercase; font-size: 11px; }
+            .sign { margin-top: 56px; display: flex; justify-content: flex-end; }
+            .line { border-top: 1px solid #111827; padding-top: 8px; min-width: 220px; text-align: center; }
+            @media print { button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()">Print</button>
+          <div class="top">
+            <div>
+              <h1>Butwal Hospital</h1>
+              <div class="muted">Laboratory Report</div>
+            </div>
+            <div>
+              <strong>${order.order_number}</strong>
+              <div class="muted">Status: ${order.status.replace("_", " ")}</div>
+              <div class="muted">${new Date().toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="meta">
+            <div><strong>Patient:</strong> ${order.patient_detail?.full_name || "-"}</div>
+            <div><strong>Patient ID:</strong> ${order.patient_detail?.patient_id || "-"}</div>
+            <div><strong>Priority:</strong> ${order.priority}</div>
+            <div><strong>Ordered By:</strong> ${order.ordered_by_name || "-"}</div>
+            <div><strong>Collected:</strong> ${order.collected_at ? new Date(order.collected_at).toLocaleString() : "-"}</div>
+            <div><strong>Completed:</strong> ${order.completed_at ? new Date(order.completed_at).toLocaleString() : "-"}</div>
+          </div>
+          <table>
+            <thead><tr><th>Test</th><th>Result</th><th>Unit</th><th>Normal Range</th><th>Flag</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="sign"><div class="line">Lab Technician</div></div>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
+
   return (
     <div className="page-enter" style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
@@ -210,7 +272,7 @@ export default function Lab() {
       <Tabs tabs={[{ key: "orders", label: "Orders" }, { key: "tests", label: "Test Catalog" }]} active={tab} onChange={setTab} />
 
       {loading ? <Spinner /> : tab === "orders" ? (
-        <OrdersTable orders={orders} canProcess={canProcess} onCollect={collectSample} onResult={openResult} />
+        <OrdersTable orders={orders} canProcess={canProcess} onCollect={collectSample} onResult={openResult} onPrint={printReport} />
       ) : (
         <TestsTable tests={tests} />
       )}
@@ -271,7 +333,7 @@ export default function Lab() {
   );
 }
 
-function OrdersTable({ orders, canProcess, onCollect, onResult }) {
+function OrdersTable({ orders, canProcess, onCollect, onResult, onPrint }) {
   if (!orders.length) return <Empty icon="LB" message="No lab orders yet" />;
   return (
     <div style={{ display: "grid", gap: 12 }}>
@@ -286,6 +348,7 @@ function OrdersTable({ orders, canProcess, onCollect, onResult }) {
               <Badge label={order.priority} color={order.priority === "stat" ? "var(--red)" : "var(--blue)"} />
               <Badge label={order.status.replace("_", " ")} color={STATUS_COLOR[order.status] || "var(--text-mute)"} />
               {canProcess && order.status === "ordered" && <Btn size="sm" onClick={() => onCollect(order)}>Collect</Btn>}
+              {order.items?.some((item) => item.status === "completed") && <Btn size="sm" variant="secondary" onClick={() => onPrint(order)}>Print Report</Btn>}
             </div>
           </div>
           <div className="table-shell" style={{ border: "1px solid var(--border-light)", borderRadius: 8, overflow: "hidden" }}>

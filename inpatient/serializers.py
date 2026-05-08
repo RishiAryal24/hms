@@ -221,6 +221,8 @@ class IPDVitalSignSerializer(VitalSignSerializer):
 class DoctorOrderSerializer(serializers.ModelSerializer):
     doctor_name = serializers.CharField(source="doctor.get_full_name", read_only=True)
     completed_by_name = serializers.CharField(source="completed_by.get_full_name", read_only=True)
+    lab_order_number = serializers.CharField(source="lab_order.order_number", read_only=True)
+    lab_order_id = serializers.IntegerField(source="lab_order.id", read_only=True)
 
     class Meta:
         model = DoctorOrder
