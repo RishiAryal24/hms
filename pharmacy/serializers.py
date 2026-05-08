@@ -29,7 +29,9 @@ class StockMovementSerializer(serializers.ModelSerializer):
     item_detail = PharmacyItemSerializer(source="item", read_only=True)
     patient_detail = PatientListSerializer(source="patient", read_only=True)
     performed_by_name = serializers.CharField(source="performed_by.get_full_name", read_only=True)
+    invoice_id = serializers.IntegerField(source="invoice_line.invoice_id", read_only=True)
     invoice_number = serializers.CharField(source="invoice_line.invoice.invoice_number", read_only=True)
+    invoice_status = serializers.CharField(source="invoice_line.invoice.status", read_only=True)
 
     class Meta:
         model = StockMovement

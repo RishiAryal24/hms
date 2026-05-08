@@ -51,6 +51,14 @@ const MOVEMENT_COLOR = {
   adjustment: "var(--amber)",
 };
 
+const INVOICE_STATUS_COLOR = {
+  draft: "var(--text-mute)",
+  issued: "var(--blue)",
+  partial: "var(--amber)",
+  paid: "var(--green)",
+  cancelled: "var(--red)",
+};
+
 export default function Pharmacy() {
   const { user } = useAuthStore();
   const [tab, setTab] = useState("items");
@@ -145,10 +153,14 @@ export default function Pharmacy() {
         patient: movementForm.movement_type === "dispense" ? movementForm.patient : null,
         admission: movementForm.admission || null,
       };
-      await createStockMovement(payload);
+      const { data } = await createStockMovement(payload);
       setMovementModal(false);
       setMovementForm(emptyMovement);
-      setSuccess(payload.movement_type === "dispense" ? "Dispensed and billed." : "Stock movement recorded.");
+      setSuccess(
+        payload.movement_type === "dispense"
+          ? `Dispensed and added to ${data.invoice_number || "the patient bill"}.`
+          : "Stock movement recorded.",
+      );
       load();
     } catch (err) {
       setError(formatError(err));
@@ -275,7 +287,7 @@ function MovementsTable({ movements }) {
   return (
     <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead><tr>{["Date", "Type", "Item", "Patient", "Qty", "Amount", "Invoice"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <thead><tr>{["Date", "Type", "Item", "Patient", "Qty", "Amount", "Billing"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
         <tbody>
           {movements.map((movement) => (
             <tr key={movement.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
@@ -285,7 +297,14 @@ function MovementsTable({ movements }) {
               <Td>{movement.patient_detail?.full_name || "-"}</Td>
               <Td>{movement.quantity}</Td>
               <Td>Rs. {movement.line_total}</Td>
-              <Td>{movement.invoice_number || "-"}</Td>
+              <Td>
+                {movement.invoice_number ? (
+                  <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <span>{movement.invoice_number}</span>
+                    <Badge label={movement.invoice_status || "draft"} color={INVOICE_STATUS_COLOR[movement.invoice_status] || "var(--text-mute)"} />
+                  </div>
+                ) : "-"}
+              </Td>
             </tr>
           ))}
         </tbody>

@@ -23,6 +23,14 @@ const PAYMENT_METHODS = [
   "cash", "card", "online", "insurance", "bank_transfer", "other",
 ].map((value) => ({ value, label: value.replace("_", " ") }));
 
+const STATUS_FILTER_OPTIONS = [
+  { value: "", label: "All statuses" },
+  { value: "draft", label: "Draft" },
+  { value: "issued", label: "Issued" },
+  { value: "partial", label: "Partial" },
+  { value: "paid", label: "Paid" },
+];
+
 const STATUS_COLOR = {
   draft: "var(--text-mute)",
   issued: "var(--blue)",
@@ -50,6 +58,7 @@ export default function Billing() {
   const [detailInvoice, setDetailInvoice] = useState(null);
   const [statement, setStatement] = useState(null);
   const [patientFilter, setPatientFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [statementPatient, setStatementPatient] = useState("");
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
@@ -71,7 +80,7 @@ export default function Billing() {
     try {
       const [summaryRes, invoiceRes, chargeRes, patientRes] = await Promise.all([
         getBillingSummary(),
-        getInvoices({ patient: patientFilter || undefined }),
+        getInvoices({ patient: patientFilter || undefined, status: statusFilter || undefined }),
         getChargeItems(),
         getPatients({ page_size: 200 }),
       ]);
@@ -84,7 +93,7 @@ export default function Billing() {
     } finally {
       setLoading(false);
     }
-  }, [patientFilter]);
+  }, [patientFilter, statusFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -175,6 +184,7 @@ export default function Billing() {
       setPaymentModal(false);
       setPaymentForm(emptyPayment);
       setSuccess("Payment recorded.");
+      setDetailInvoice(null);
       load();
     } catch (err) {
       setError(formatError(err));
@@ -304,14 +314,15 @@ export default function Billing() {
 
   const printStatement = (data) => {
     const categoryBlocks = (data.categories || []).map((category) => `
-      <h2>${category.category}</h2>
+      <h2>${category.label || category.category}</h2>
       <table>
-        <thead><tr><th>Date</th><th>Invoice</th><th>Description</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead>
+        <thead><tr><th>Date</th><th>Invoice</th><th>Status</th><th>Description</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead>
         <tbody>
           ${category.lines.map((line) => `
             <tr>
               <td>${new Date(line.date).toLocaleDateString()}</td>
               <td>${line.invoice_number}</td>
+              <td>${line.invoice_status}</td>
               <td>${line.description}</td>
               <td>${line.quantity}</td>
               <td>Rs. ${line.unit_price}</td>
@@ -319,8 +330,17 @@ export default function Billing() {
             </tr>
           `).join("")}
         </tbody>
-        <tfoot><tr><td colspan="5"><strong>${category.category} total</strong></td><td><strong>Rs. ${category.total}</strong></td></tr></tfoot>
+        <tfoot><tr><td colspan="6"><strong>${category.label || category.category} total</strong></td><td><strong>Rs. ${category.total}</strong></td></tr></tfoot>
       </table>
+    `).join("");
+    const payments = (data.payments || []).map((payment) => `
+      <tr>
+        <td>${new Date(payment.received_at).toLocaleDateString()}</td>
+        <td>${payment.invoice_number}</td>
+        <td>${payment.method}</td>
+        <td>${payment.reference || "-"}</td>
+        <td>Rs. ${payment.amount}</td>
+      </tr>
     `).join("");
     const popup = window.open("", "_blank", "width=980,height=760");
     popup.document.write(`
@@ -361,6 +381,11 @@ export default function Billing() {
             <div><span>Total paid</span><strong>Rs. ${data.totals?.paid || 0}</strong></div>
             <div><span>Amount due</span><strong>Rs. ${data.totals?.balance || 0}</strong></div>
           </div>
+          <h2>Payments Received</h2>
+          <table>
+            <thead><tr><th>Date</th><th>Invoice</th><th>Method</th><th>Reference</th><th>Amount</th></tr></thead>
+            <tbody>${payments || "<tr><td colspan='5'>No payments received</td></tr>"}</tbody>
+          </table>
         </body>
       </html>
     `);
@@ -394,9 +419,10 @@ export default function Billing() {
       <Tabs tabs={[{ key: "invoices", label: "Invoices" }, { key: "charges", label: "Charge Master" }]} active={tab} onChange={setTab} />
 
       {tab === "invoices" && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 16, maxWidth: 420 }}>
-          <Field label="" name="patient_filter" value={patientFilter} onChange={(event) => setPatientFilter(event.target.value)} options={patientOptions} />
-          <Btn variant="secondary" onClick={() => setPatientFilter("")} disabled={!patientFilter}>Clear</Btn>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 1fr) 180px auto", gap: 10, marginBottom: 16, maxWidth: 720, alignItems: "end" }}>
+          <Field label="Patient" name="patient_filter" value={patientFilter} onChange={(event) => setPatientFilter(event.target.value)} options={patientOptions} />
+          <Field label="Status" name="status_filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} options={STATUS_FILTER_OPTIONS} />
+          <Btn variant="secondary" onClick={() => { setPatientFilter(""); setStatusFilter(""); }} disabled={!patientFilter && !statusFilter}>Clear</Btn>
         </div>
       )}
 
@@ -444,13 +470,19 @@ export default function Billing() {
       </Modal>
 
       <Modal open={paymentModal} onClose={() => setPaymentModal(false)} title={`Record Payment - ${selectedInvoice?.invoice_number || ""}`} width={460}>
+        {selectedInvoice && (
+          <Alert
+            type="info"
+            message={`Balance due: Rs. ${selectedInvoice.balance_amount}. This payment will update the invoice status automatically.`}
+          />
+        )}
         <Field label="Amount" name="amount" type="number" value={paymentForm.amount} onChange={handlePayment} required />
         <Field label="Method" name="method" value={paymentForm.method} onChange={handlePayment} options={PAYMENT_METHODS} />
         <Field label="Reference" name="reference" value={paymentForm.reference} onChange={handlePayment} />
         <Field label="Notes" name="notes" value={paymentForm.notes} onChange={handlePayment} />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Btn variant="secondary" onClick={() => setPaymentModal(false)}>Cancel</Btn>
-          <Btn onClick={savePayment} disabled={saving || !paymentForm.amount}>Record Payment</Btn>
+          <Btn onClick={savePayment} disabled={saving || !paymentForm.amount || Number(paymentForm.amount) > Number(selectedInvoice?.balance_amount || 0)}>Record Payment</Btn>
         </div>
       </Modal>
 
@@ -601,8 +633,15 @@ function PaymentsTable({ payments }) {
 
 function StatementView({ statement }) {
   const categories = statement.categories || [];
+  const payments = statement.payments || [];
   return (
     <div>
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontWeight: 800 }}>{statement.patient?.full_name || "-"}</div>
+        <div style={{ color: "var(--text-mute)", fontSize: 12 }}>
+          {statement.patient?.patient_id || "-"} - {statement.totals?.invoice_count || 0} invoice(s) - {statement.totals?.unpaid_invoice_count || 0} unpaid
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 18 }}>
         <Card><Metric label="Billed" value={`Rs. ${statement.totals?.billed || 0}`} color="var(--blue)" /></Card>
         <Card><Metric label="Paid" value={`Rs. ${statement.totals?.paid || 0}`} color="var(--green)" /></Card>
@@ -611,17 +650,18 @@ function StatementView({ statement }) {
       {!categories.length ? <Empty icon="BL" message="No billable charges found" /> : categories.map((category) => (
         <div key={category.category} style={{ marginBottom: 18 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-            <div style={{ fontWeight: 800, textTransform: "capitalize" }}>{category.category}</div>
+            <div style={{ fontWeight: 800, textTransform: "capitalize" }}>{category.label || category.category}</div>
             <div style={{ fontWeight: 800, color: "var(--teal)" }}>Rs. {category.total}</div>
           </div>
           <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["Date", "Invoice", "Description", "Qty", "Rate", "Total"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+              <thead><tr>{["Date", "Invoice", "Status", "Description", "Qty", "Rate", "Total"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
               <tbody>
                 {category.lines.map((line) => (
                   <tr key={line.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
                     <Td>{new Date(line.date).toLocaleDateString()}</Td>
                     <Td>{line.invoice_number}</Td>
+                    <Td><Badge label={line.invoice_status} color={STATUS_COLOR[line.invoice_status] || "var(--text-mute)"} /></Td>
                     <Td>{line.description}</Td>
                     <Td>{line.quantity}</Td>
                     <Td>Rs. {line.unit_price}</Td>
@@ -633,6 +673,25 @@ function StatementView({ statement }) {
           </div>
         </div>
       ))}
+      <div style={{ fontWeight: 800, marginBottom: 8 }}>Payments Received</div>
+      {!payments.length ? <Empty icon="PY" message="No payments received" /> : (
+        <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead><tr>{["Date", "Invoice", "Method", "Reference", "Amount"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+            <tbody>
+              {payments.map((payment) => (
+                <tr key={payment.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                  <Td>{new Date(payment.received_at).toLocaleDateString()}</Td>
+                  <Td>{payment.invoice_number}</Td>
+                  <Td>{payment.method}</Td>
+                  <Td>{payment.reference || "-"}</Td>
+                  <Td>Rs. {payment.amount}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.db.models import Sum
 
 from patients.serializers import PatientListSerializer
-from .models import ChargeItem, Invoice, InvoiceLine, Payment
+from .models import ChargeCategory, ChargeItem, Invoice, InvoiceLine, Payment
 
 
 class ChargeItemSerializer(serializers.ModelSerializer):
@@ -39,6 +39,9 @@ class PaymentSerializer(serializers.ModelSerializer):
     def validate_amount(self, value):
         if value <= 0:
             raise serializers.ValidationError("Payment amount must be greater than zero.")
+        invoice = self.context.get("invoice")
+        if invoice and value > invoice.balance_amount:
+            raise serializers.ValidationError("Payment cannot be greater than the remaining invoice balance.")
         return value
 
 
@@ -72,6 +75,7 @@ class PatientStatementSerializer(serializers.Serializer):
     patient = serializers.SerializerMethodField()
     invoices = serializers.SerializerMethodField()
     categories = serializers.SerializerMethodField()
+    payments = serializers.SerializerMethodField()
     totals = serializers.SerializerMethodField()
 
     def get_patient(self, patient):
@@ -84,28 +88,52 @@ class PatientStatementSerializer(serializers.Serializer):
     def get_categories(self, patient):
         lines = InvoiceLine.objects.filter(
             invoice__patient=patient,
-        ).exclude(invoice__status="cancelled")
+        ).exclude(invoice__status="cancelled").select_related("invoice")
+        category_labels = dict(ChargeCategory.choices)
         categories = []
         for row in lines.values("category").annotate(total=Sum("line_total")).order_by("category"):
-            category_lines = lines.filter(category=row["category"]).select_related("invoice").order_by("created_at")
+            category_lines = lines.filter(category=row["category"]).order_by("created_at")
             categories.append({
                 "category": row["category"],
+                "label": category_labels.get(row["category"], row["category"].title()),
                 "total": row["total"] or 0,
                 "lines": [
                     {
                         "id": line.id,
+                        "invoice_id": line.invoice_id,
                         "invoice_number": line.invoice.invoice_number,
+                        "invoice_status": line.invoice.status,
                         "date": line.created_at,
                         "description": line.description,
                         "quantity": line.quantity,
                         "unit_price": line.unit_price,
                         "line_total": line.line_total,
                         "source_module": line.source_module,
+                        "source_id": line.source_id,
                     }
                     for line in category_lines
                 ],
             })
         return categories
+
+    def get_payments(self, patient):
+        payments = Payment.objects.filter(
+            invoice__patient=patient,
+        ).exclude(invoice__status="cancelled").select_related("invoice", "received_by").order_by("-received_at")
+        return [
+            {
+                "id": payment.id,
+                "invoice_id": payment.invoice_id,
+                "invoice_number": payment.invoice.invoice_number,
+                "received_at": payment.received_at,
+                "method": payment.method,
+                "reference": payment.reference,
+                "amount": payment.amount,
+                "received_by_name": payment.received_by.get_full_name() if payment.received_by else "",
+                "notes": payment.notes,
+            }
+            for payment in payments
+        ]
 
     def get_totals(self, patient):
         invoices = Invoice.objects.filter(patient=patient).exclude(status="cancelled")
@@ -113,4 +141,6 @@ class PatientStatementSerializer(serializers.Serializer):
             "billed": invoices.aggregate(total=Sum("total_amount"))["total"] or 0,
             "paid": invoices.aggregate(total=Sum("paid_amount"))["total"] or 0,
             "balance": invoices.aggregate(total=Sum("balance_amount"))["total"] or 0,
+            "invoice_count": invoices.count(),
+            "unpaid_invoice_count": invoices.exclude(status="paid").count(),
         }

@@ -1,6 +1,7 @@
 from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, generics, status
+from rest_framework import filters, generics
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -90,9 +91,22 @@ class PaymentCreateView(generics.CreateAPIView):
     serializer_class = PaymentSerializer
     permission_classes = [CanBill]
 
+    def get_invoice(self):
+        if hasattr(self, "_invoice"):
+            return self._invoice
+        try:
+            self._invoice = Invoice.objects.get(pk=self.kwargs["invoice_pk"])
+        except Invoice.DoesNotExist as exc:
+            raise NotFound("Invoice not found.") from exc
+        return self._invoice
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["invoice"] = self.get_invoice()
+        return context
+
     def perform_create(self, serializer):
-        invoice = Invoice.objects.get(pk=self.kwargs["invoice_pk"])
-        serializer.save(invoice=invoice, received_by=self.request.user)
+        serializer.save(invoice=self.get_invoice(), received_by=self.request.user)
 
 
 class PaymentListView(generics.ListAPIView):
@@ -127,7 +141,8 @@ class BillingSummaryView(APIView):
     permission_classes = [CanViewBilling]
 
     def get(self, request):
-        totals = Invoice.objects.aggregate(
+        invoices = Invoice.objects.exclude(status="cancelled")
+        totals = invoices.aggregate(
             total_billed=Sum("total_amount"),
             total_paid=Sum("paid_amount"),
             total_balance=Sum("balance_amount"),
@@ -136,8 +151,8 @@ class BillingSummaryView(APIView):
             "total_billed": totals["total_billed"] or 0,
             "total_paid": totals["total_paid"] or 0,
             "total_balance": totals["total_balance"] or 0,
-            "draft_count": Invoice.objects.filter(status="draft").count(),
-            "unpaid_count": Invoice.objects.exclude(status__in=["paid", "cancelled"]).count(),
+            "draft_count": invoices.filter(status="draft").count(),
+            "unpaid_count": invoices.exclude(status="paid").count(),
         })
 
 
