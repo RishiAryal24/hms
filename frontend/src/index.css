@@ -416,20 +416,22 @@ textarea.field-control { min-height: 84px; resize: vertical; }
   backdrop-filter: blur(6px);
   z-index: 1000;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 24px;
+  padding: 32px 24px;
+  overflow-y: auto;
 }
 
 .modal-panel {
   width: 100%;
-  max-height: 90vh;
+  max-height: calc(100vh - 64px);
   overflow: auto;
   background: #ffffff;
   border: 1px solid rgba(255,255,255,.7);
   border-radius: 8px;
   box-shadow: 0 28px 70px rgba(6, 15, 24, .36);
   animation: fadeUp .18s ease both;
+  margin: auto 0;
 }
 
 .modal-header {
@@ -784,8 +786,13 @@ textarea.field-control { min-height: 84px; resize: vertical; }
   .page-enter { padding: 18px !important; }
 
   .modal-backdrop {
-    align-items: stretch;
+    align-items: flex-start;
     padding: 12px;
+  }
+
+  .modal-panel {
+    max-height: calc(100vh - 24px);
+    margin: 0;
   }
 
   .modal-body { padding: 18px; }
