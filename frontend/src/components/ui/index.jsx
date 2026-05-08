@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+
 export const Badge = ({ label, color = "var(--teal)" }) => (
   <span className="badge" style={{ "--badge-color": color }}>
     {label}
@@ -60,7 +62,7 @@ export const StatCard = ({ label, value, color = "var(--teal)", icon }) => (
 
 export const Modal = ({ open, onClose, title, children, width = 560 }) => {
   if (!open) return null;
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="modal-panel" style={{ maxWidth: width }}>
         <div className="modal-header">
@@ -69,7 +71,8 @@ export const Modal = ({ open, onClose, title, children, width = 560 }) => {
         </div>
         <div className="modal-body">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
