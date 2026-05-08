@@ -63,6 +63,7 @@ export default function App() {
 
           <Route path="reception" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionDashboard /></RequireRole>} />
           <Route path="reception/patients" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionPatients /></RequireRole>} />
+          <Route path="reception/patients/:id" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><PatientDetail /></RequireRole>} />
           <Route path="reception/appointments" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionAppts /></RequireRole>} />
           <Route path="reception/ipd" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><IPD /></RequireRole>} />
           <Route path="reception/billing" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Billing /></RequireRole>} />
