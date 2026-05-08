@@ -3,6 +3,10 @@ import { getDoctorProfiles } from "../../api/clinical";
 import { createLabOrder, getLabTests } from "../../api/lab";
 import {
   assignBed,
+  clearBillingDischarge,
+  clearClinicalDischarge,
+  clearNursingDischarge,
+  clearPharmacyDischarge,
   createBed,
   completeDoctorOrder,
   createDoctorRound,
@@ -15,6 +19,7 @@ import {
   getBeds,
   getDoctorRounds,
   getDoctorOrders,
+  getDischargeClearance,
   getIPDVitals,
   getNursingRounds,
   getWards,
@@ -58,7 +63,29 @@ const emptyVital = {
 };
 const emptyOrder = { admission: "", order_type: "medication", priority: "routine", title: "", instructions: "" };
 const emptyLabFromOrder = { source_order: "", patient: "", admission: "", priority: "routine", clinical_notes: "", tests: [] };
-const emptyDischarge = { admission: "", diagnosis_on_discharge: "", discharge_summary: "", generate_bed_charges: true };
+const emptyDischarge = {
+  admission: "",
+  patientName: "",
+  final_diagnosis: "",
+  discharge_summary: "",
+  treatment_given: "",
+  condition_at_discharge: "",
+  discharge_medications: "",
+  follow_up_advice: "",
+  clinical_notes: "",
+  vitals_stable: false,
+  iv_removed: false,
+  catheter_removed: false,
+  instructions_explained: false,
+  nursing_notes: "",
+  generate_bed_charges: true,
+  billing_notes: "",
+  pharmacy_notes: "",
+  clinical_cleared: false,
+  nursing_cleared: false,
+  billing_cleared: false,
+  pharmacy_cleared: false,
+};
 
 const ORDER_TYPES = [
   { value: "medication", label: "Medication" },
@@ -390,19 +417,60 @@ export default function IPD() {
     }
   };
 
-  const openDischargeModal = (admission) => {
-    setDischargeForm({ ...emptyDischarge, admission: admission.id });
+  const openDischargeModal = async (admission) => {
     setDischargeModal(true);
+    setDischargeForm({
+      ...emptyDischarge,
+      admission: admission.id,
+      patientName: admission.patient_detail?.full_name || admission.admission_number,
+      ...(admission.discharge_clearance || {}),
+    });
+    try {
+      const clearanceRes = await getDischargeClearance(admission.id);
+      setDischargeForm((current) => ({
+        ...current,
+        ...clearanceRes.data,
+        admission: admission.id,
+        patientName: admission.patient_detail?.full_name || admission.admission_number,
+      }));
+    } catch {
+      setError("Unable to load discharge clearance.");
+    }
+  };
+
+  const saveDischargeStep = async (step) => {
+    setSaving(true);
+    setError("");
+    try {
+      const stepMap = {
+        clinical: clearClinicalDischarge,
+        nursing: clearNursingDischarge,
+        billing: clearBillingDischarge,
+        pharmacy: clearPharmacyDischarge,
+      };
+      const res = await stepMap[step](dischargeForm.admission, dischargeForm);
+      setDischargeForm((current) => ({ ...current, ...res.data }));
+      setSuccess(`${step[0].toUpperCase()}${step.slice(1)} discharge clearance saved.`);
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveDischarge = async () => {
     setSaving(true);
     setError("");
     try {
-      await dischargeAdmission(dischargeForm.admission, dischargeForm);
+      await dischargeAdmission(dischargeForm.admission, {
+        diagnosis_on_discharge: dischargeForm.final_diagnosis,
+        discharge_summary: dischargeForm.discharge_summary,
+        generate_bed_charges: dischargeForm.generate_bed_charges,
+      });
       setDischargeModal(false);
       setDischargeForm(emptyDischarge);
-      setSuccess("Patient discharged and discharge bill prepared.");
+      setSuccess("Patient discharged, bed released, and final billing prepared.");
       load();
     } catch (err) {
       setError(formatError(err));
@@ -572,19 +640,124 @@ export default function IPD() {
         </div>
       </Modal>
 
-      <Modal open={dischargeModal} onClose={() => setDischargeModal(false)} title="Discharge Patient" width={560}>
-        <Field label="Diagnosis on Discharge" name="diagnosis_on_discharge" value={dischargeForm.diagnosis_on_discharge} onChange={handleDischarge} />
-        <Field label="Discharge Summary" name="discharge_summary" value={dischargeForm.discharge_summary} onChange={handleDischarge} />
-        <label style={{ display: "flex", alignItems: "center", gap: 8, margin: "8px 0 16px", color: "var(--text-mute)", fontSize: 13 }}>
-          <input type="checkbox" name="generate_bed_charges" checked={dischargeForm.generate_bed_charges} onChange={handleDischarge} />
-          Add bed-day charges to the discharge bill
-        </label>
-        <Alert type="warning" message="Discharging releases the active bed and removes this patient from active IPD admissions." />
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <Btn variant="secondary" onClick={() => setDischargeModal(false)}>Cancel</Btn>
-          <Btn onClick={saveDischarge} disabled={saving}>Discharge</Btn>
+      <Modal open={dischargeModal} onClose={() => setDischargeModal(false)} title="Patient Discharge Flow" width={820}>
+        <div style={{ display: "grid", gap: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+            <div>
+              <div style={{ fontWeight: 800 }}>{dischargeForm.patientName || "Patient"}</div>
+              <div style={{ color: "var(--text-mute)", fontSize: 12 }}>Complete all clearances before final discharge.</div>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <StepStatus label="Clinical" done={dischargeForm.clinical_cleared} />
+              <StepStatus label="Nursing" done={dischargeForm.nursing_cleared} />
+              <StepStatus label="Billing" done={dischargeForm.billing_cleared} />
+              <StepStatus label="Pharmacy" done={dischargeForm.pharmacy_cleared} />
+            </div>
+          </div>
+
+          <DischargeSection
+            title="Clinical Clearance"
+            cleared={dischargeForm.clinical_cleared}
+            clearedBy={dischargeForm.clinical_cleared_by_name}
+            onClear={() => saveDischargeStep("clinical")}
+            saving={saving}
+            actionLabel="Clear Clinical"
+          >
+            <Field label="Final Diagnosis" name="final_diagnosis" value={dischargeForm.final_diagnosis} onChange={handleDischarge} />
+            <Field label="Discharge Summary" name="discharge_summary" value={dischargeForm.discharge_summary} onChange={handleDischarge} />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <Field label="Treatment Given" name="treatment_given" value={dischargeForm.treatment_given} onChange={handleDischarge} />
+              <Field label="Condition at Discharge" name="condition_at_discharge" value={dischargeForm.condition_at_discharge} onChange={handleDischarge} />
+            </div>
+            <Field label="Discharge Medications" name="discharge_medications" value={dischargeForm.discharge_medications} onChange={handleDischarge} />
+            <Field label="Follow-up Advice" name="follow_up_advice" value={dischargeForm.follow_up_advice} onChange={handleDischarge} />
+            <Field label="Clinical Notes" name="clinical_notes" value={dischargeForm.clinical_notes} onChange={handleDischarge} />
+          </DischargeSection>
+
+          <DischargeSection
+            title="Nursing Clearance"
+            cleared={dischargeForm.nursing_cleared}
+            clearedBy={dischargeForm.nursing_cleared_by_name}
+            onClear={() => saveDischargeStep("nursing")}
+            saving={saving}
+            actionLabel="Clear Nursing"
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+              <CheckField label="Vitals stable" name="vitals_stable" checked={dischargeForm.vitals_stable} onChange={handleDischarge} />
+              <CheckField label="IV line removed" name="iv_removed" checked={dischargeForm.iv_removed} onChange={handleDischarge} />
+              <CheckField label="Catheter removed" name="catheter_removed" checked={dischargeForm.catheter_removed} onChange={handleDischarge} />
+              <CheckField label="Instructions explained" name="instructions_explained" checked={dischargeForm.instructions_explained} onChange={handleDischarge} />
+            </div>
+            <Field label="Nursing Notes" name="nursing_notes" value={dischargeForm.nursing_notes} onChange={handleDischarge} />
+          </DischargeSection>
+
+          <DischargeSection
+            title="Billing Clearance"
+            cleared={dischargeForm.billing_cleared}
+            clearedBy={dischargeForm.billing_cleared_by_name}
+            onClear={() => saveDischargeStep("billing")}
+            saving={saving}
+            actionLabel="Clear Billing"
+          >
+            <CheckField label="Add bed-day charges to the final bill" name="generate_bed_charges" checked={dischargeForm.generate_bed_charges} onChange={handleDischarge} />
+            <Field label="Billing Notes" name="billing_notes" value={dischargeForm.billing_notes} onChange={handleDischarge} />
+          </DischargeSection>
+
+          <DischargeSection
+            title="Pharmacy Clearance"
+            cleared={dischargeForm.pharmacy_cleared}
+            clearedBy={dischargeForm.pharmacy_cleared_by_name}
+            onClear={() => saveDischargeStep("pharmacy")}
+            saving={saving}
+            actionLabel="Clear Pharmacy"
+          >
+            <Field label="Pharmacy Notes" name="pharmacy_notes" value={dischargeForm.pharmacy_notes} onChange={handleDischarge} />
+          </DischargeSection>
+
+          <Alert type="warning" message="Final discharge releases the active bed and removes this patient from active IPD admissions." />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <Btn variant="secondary" onClick={() => setDischargeModal(false)}>Close</Btn>
+            <Btn
+              onClick={saveDischarge}
+              disabled={saving || !dischargeForm.clinical_cleared || !dischargeForm.nursing_cleared || !dischargeForm.billing_cleared || !dischargeForm.pharmacy_cleared}
+            >
+              Final Discharge
+            </Btn>
+          </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function StepStatus({ label, done }) {
+  return <Badge label={`${label}: ${done ? "Cleared" : "Pending"}`} color={done ? "var(--green)" : "var(--amber)"} />;
+}
+
+function CheckField({ label, name, checked, onChange }) {
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--text-mute)", fontSize: 13 }}>
+      <input type="checkbox" name={name} checked={!!checked} onChange={onChange} />
+      {label}
+    </label>
+  );
+}
+
+function DischargeSection({ title, cleared, clearedBy, children, onClear, saving, actionLabel }) {
+  return (
+    <div style={{ border: "1px solid var(--border)", borderRadius: 8, padding: 14, background: "var(--card)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 12 }}>
+        <div>
+          <div style={{ fontWeight: 800 }}>{title}</div>
+          <div style={{ color: "var(--text-dim)", fontSize: 11 }}>
+            {cleared ? `Cleared${clearedBy ? ` by ${clearedBy}` : ""}` : "Pending"}
+          </div>
+        </div>
+        <Btn size="sm" variant={cleared ? "secondary" : "primary"} onClick={onClear} disabled={saving}>
+          {cleared ? "Update" : actionLabel}
+        </Btn>
+      </div>
+      <div style={{ display: "grid", gap: 10 }}>{children}</div>
     </div>
   );
 }

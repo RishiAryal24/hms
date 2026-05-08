@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Bed, BedAssignment, BedTransfer, NursingRound, Room, Ward
+from .models import Bed, BedAssignment, BedTransfer, DischargeClearance, NursingRound, Room, Ward
 
 
 class RoomInline(admin.TabularInline):
@@ -53,3 +53,23 @@ class NursingRoundAdmin(admin.ModelAdmin):
     list_display = ["admission", "nurse", "round_time", "condition", "pain_score"]
     list_filter = ["condition"]
     search_fields = ["admission__admission_number", "admission__patient__patient_id", "nurse__username"]
+
+
+@admin.register(DischargeClearance)
+class DischargeClearanceAdmin(admin.ModelAdmin):
+    list_display = [
+        "admission",
+        "clinical_cleared",
+        "nursing_cleared",
+        "billing_cleared",
+        "pharmacy_cleared",
+        "final_discharge_completed",
+    ]
+    list_filter = [
+        "clinical_cleared",
+        "nursing_cleared",
+        "billing_cleared",
+        "pharmacy_cleared",
+        "final_discharge_completed",
+    ]
+    search_fields = ["admission__admission_number", "admission__patient__patient_id"]

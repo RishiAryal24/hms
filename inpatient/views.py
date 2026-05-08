@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -9,11 +10,23 @@ from rest_framework.views import APIView
 
 from patients.models import AdmissionRecord, VitalSign
 from shared.permissions import IsTenantAdmin, role_required
-from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorOrder, DoctorRound, NursingRound, Room, Ward
+from .models import (
+    Bed,
+    BedAssignment,
+    BedStatus,
+    BedTransfer,
+    DischargeClearance,
+    DoctorOrder,
+    DoctorRound,
+    NursingRound,
+    Room,
+    Ward,
+)
 from .serializers import (
     BedAssignmentSerializer,
     BedSerializer,
     AdmissionDischargeSerializer,
+    DischargeClearanceSerializer,
     DoctorOrderSerializer,
     DoctorRoundSerializer,
     IPDVitalSignSerializer,
@@ -33,6 +46,8 @@ CanDoctorRound = role_required("receptionist", "doctor", "nurse")
 CanDischarge = role_required("doctor")
 CanOrder = role_required("doctor")
 CanVitals = role_required("doctor", "nurse")
+CanBillingClearance = role_required("billing_staff", "receptionist")
+CanPharmacyClearance = role_required("pharmacist")
 
 
 class WardListCreateView(generics.ListCreateAPIView):
@@ -256,30 +271,167 @@ class CompleteDoctorOrderView(APIView):
         return Response(DoctorOrderSerializer(order).data)
 
 
+def get_active_admission(admission_pk):
+    return AdmissionRecord.objects.select_related("patient").get(pk=admission_pk, status="admitted")
+
+
+def get_or_create_discharge_clearance(admission):
+    clearance, _ = DischargeClearance.objects.get_or_create(admission=admission)
+    return clearance
+
+
+def update_clearance_fields(clearance, data, fields):
+    for field in fields:
+        if field in data:
+            setattr(clearance, field, data.get(field))
+
+
+class DischargeClearanceDetailView(APIView):
+    permission_classes = [CanViewIPD]
+
+    def get(self, request, admission_pk):
+        admission = get_active_admission(admission_pk)
+        clearance = get_or_create_discharge_clearance(admission)
+        return Response(DischargeClearanceSerializer(clearance).data)
+
+
+class ClinicalDischargeClearanceView(APIView):
+    permission_classes = [CanDischarge]
+
+    def post(self, request, admission_pk):
+        admission = get_active_admission(admission_pk)
+        clearance = get_or_create_discharge_clearance(admission)
+        update_clearance_fields(clearance, request.data, [
+            "final_diagnosis",
+            "discharge_summary",
+            "treatment_given",
+            "condition_at_discharge",
+            "discharge_medications",
+            "follow_up_advice",
+            "clinical_notes",
+        ])
+        clearance.clinical_cleared = True
+        clearance.clinical_cleared_by = request.user
+        clearance.clinical_cleared_at = timezone.now()
+        clearance.save()
+        return Response(DischargeClearanceSerializer(clearance).data)
+
+
+class NursingDischargeClearanceView(APIView):
+    permission_classes = [CanNursing]
+
+    def post(self, request, admission_pk):
+        admission = get_active_admission(admission_pk)
+        clearance = get_or_create_discharge_clearance(admission)
+        update_clearance_fields(clearance, request.data, [
+            "vitals_stable",
+            "iv_removed",
+            "catheter_removed",
+            "instructions_explained",
+            "nursing_notes",
+        ])
+        clearance.nursing_cleared = True
+        clearance.nursing_cleared_by = request.user
+        clearance.nursing_cleared_at = timezone.now()
+        clearance.save()
+        return Response(DischargeClearanceSerializer(clearance).data)
+
+
+class BillingDischargeClearanceView(APIView):
+    permission_classes = [CanBillingClearance]
+
+    def post(self, request, admission_pk):
+        admission = get_active_admission(admission_pk)
+        clearance = get_or_create_discharge_clearance(admission)
+        update_clearance_fields(clearance, request.data, [
+            "generate_bed_charges",
+            "billing_notes",
+        ])
+        clearance.billing_cleared = True
+        clearance.billing_cleared_by = request.user
+        clearance.billing_cleared_at = timezone.now()
+        clearance.save()
+        return Response(DischargeClearanceSerializer(clearance).data)
+
+
+class PharmacyDischargeClearanceView(APIView):
+    permission_classes = [CanPharmacyClearance]
+
+    def post(self, request, admission_pk):
+        admission = get_active_admission(admission_pk)
+        clearance = get_or_create_discharge_clearance(admission)
+        update_clearance_fields(clearance, request.data, ["pharmacy_notes"])
+        clearance.pharmacy_cleared = True
+        clearance.pharmacy_cleared_by = request.user
+        clearance.pharmacy_cleared_at = timezone.now()
+        clearance.save()
+        return Response(DischargeClearanceSerializer(clearance).data)
+
+
 class DischargeAdmissionView(APIView):
     permission_classes = [CanDischarge]
 
     def post(self, request, admission_pk):
         serializer = AdmissionDischargeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        admission = AdmissionRecord.objects.select_related("patient").get(pk=admission_pk, status="admitted")
-        discharge_time = timezone.now()
+        admission = get_active_admission(admission_pk)
+        clearance = get_or_create_discharge_clearance(admission)
 
-        if serializer.validated_data["generate_bed_charges"]:
-            generate_bed_charges(admission, request.user, discharge_time)
-
-        admission.status = "discharged"
-        admission.discharge_date = discharge_time
-        admission.diagnosis_on_discharge = serializer.validated_data.get("diagnosis_on_discharge", "")
-        admission.discharge_summary = serializer.validated_data.get("discharge_summary", "")
-        admission.save(update_fields=[
-            "status", "discharge_date", "diagnosis_on_discharge",
-            "discharge_summary", "updated_at",
+        if serializer.validated_data.get("diagnosis_on_discharge"):
+            clearance.final_diagnosis = serializer.validated_data["diagnosis_on_discharge"]
+        if serializer.validated_data.get("discharge_summary"):
+            clearance.discharge_summary = serializer.validated_data["discharge_summary"]
+        clearance.generate_bed_charges = serializer.validated_data["generate_bed_charges"]
+        clearance.save(update_fields=[
+            "final_diagnosis",
+            "discharge_summary",
+            "generate_bed_charges",
+            "updated_at",
         ])
 
-        active_assignment = admission.bed_assignments.filter(status="active").select_related("bed").first()
-        if active_assignment:
-            active_assignment.release()
+        if not clearance.ready_for_discharge:
+            missing = []
+            if not clearance.clinical_cleared:
+                missing.append("clinical")
+            if not clearance.nursing_cleared:
+                missing.append("nursing")
+            if not clearance.billing_cleared:
+                missing.append("billing")
+            if not clearance.pharmacy_cleared:
+                missing.append("pharmacy")
+            return Response(
+                {"detail": f"Discharge clearance is incomplete: {', '.join(missing)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        discharge_time = timezone.now()
+
+        with transaction.atomic():
+            if clearance.generate_bed_charges:
+                generate_bed_charges(admission, request.user, discharge_time)
+
+            admission.status = "discharged"
+            admission.discharge_date = discharge_time
+            admission.diagnosis_on_discharge = clearance.final_diagnosis
+            admission.discharge_summary = clearance.discharge_summary
+            admission.save(update_fields=[
+                "status", "discharge_date", "diagnosis_on_discharge",
+                "discharge_summary", "updated_at",
+            ])
+
+            active_assignment = admission.bed_assignments.filter(status="active").select_related("bed").first()
+            if active_assignment:
+                active_assignment.release()
+
+            clearance.final_discharge_completed = True
+            clearance.final_discharge_by = request.user
+            clearance.final_discharge_at = discharge_time
+            clearance.save(update_fields=[
+                "final_discharge_completed",
+                "final_discharge_by",
+                "final_discharge_at",
+                "updated_at",
+            ])
 
         return Response(IPDAdmissionSerializer(admission).data)
 

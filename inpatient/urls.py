@@ -19,5 +19,10 @@ urlpatterns = [
     path("admissions/<int:admission_pk>/vitals/", views.IPDVitalSignListCreateView.as_view(), name="ipd-vitals"),
     path("admissions/<int:admission_pk>/orders/", views.DoctorOrderListCreateView.as_view(), name="ipd-orders"),
     path("admissions/<int:admission_pk>/orders/<int:pk>/complete/", views.CompleteDoctorOrderView.as_view(), name="ipd-order-complete"),
+    path("admissions/<int:admission_pk>/discharge-clearance/", views.DischargeClearanceDetailView.as_view(), name="ipd-discharge-clearance"),
+    path("admissions/<int:admission_pk>/discharge-clearance/clinical/", views.ClinicalDischargeClearanceView.as_view(), name="ipd-discharge-clinical"),
+    path("admissions/<int:admission_pk>/discharge-clearance/nursing/", views.NursingDischargeClearanceView.as_view(), name="ipd-discharge-nursing"),
+    path("admissions/<int:admission_pk>/discharge-clearance/billing/", views.BillingDischargeClearanceView.as_view(), name="ipd-discharge-billing"),
+    path("admissions/<int:admission_pk>/discharge-clearance/pharmacy/", views.PharmacyDischargeClearanceView.as_view(), name="ipd-discharge-pharmacy"),
     path("admissions/<int:admission_pk>/discharge/", views.DischargeAdmissionView.as_view(), name="ipd-discharge"),
 ]

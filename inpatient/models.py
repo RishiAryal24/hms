@@ -230,3 +230,91 @@ class DoctorOrder(TimeStampedModel):
 
     def __str__(self):
         return f"{self.get_order_type_display()} order - {self.admission.admission_number}"
+
+
+class DischargeClearance(TimeStampedModel):
+    admission = models.OneToOneField(
+        AdmissionRecord,
+        on_delete=models.CASCADE,
+        related_name="discharge_clearance",
+    )
+
+    clinical_cleared = models.BooleanField(default=False)
+    final_diagnosis = models.TextField(blank=True)
+    discharge_summary = models.TextField(blank=True)
+    treatment_given = models.TextField(blank=True)
+    condition_at_discharge = models.CharField(max_length=150, blank=True)
+    discharge_medications = models.TextField(blank=True)
+    follow_up_advice = models.TextField(blank=True)
+    clinical_notes = models.TextField(blank=True)
+    clinical_cleared_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="clinical_discharge_clearances",
+    )
+    clinical_cleared_at = models.DateTimeField(null=True, blank=True)
+
+    nursing_cleared = models.BooleanField(default=False)
+    vitals_stable = models.BooleanField(default=False)
+    iv_removed = models.BooleanField(default=False)
+    catheter_removed = models.BooleanField(default=False)
+    instructions_explained = models.BooleanField(default=False)
+    nursing_notes = models.TextField(blank=True)
+    nursing_cleared_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="nursing_discharge_clearances",
+    )
+    nursing_cleared_at = models.DateTimeField(null=True, blank=True)
+
+    billing_cleared = models.BooleanField(default=False)
+    generate_bed_charges = models.BooleanField(default=True)
+    billing_notes = models.TextField(blank=True)
+    billing_cleared_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="billing_discharge_clearances",
+    )
+    billing_cleared_at = models.DateTimeField(null=True, blank=True)
+
+    pharmacy_cleared = models.BooleanField(default=False)
+    pharmacy_notes = models.TextField(blank=True)
+    pharmacy_cleared_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pharmacy_discharge_clearances",
+    )
+    pharmacy_cleared_at = models.DateTimeField(null=True, blank=True)
+
+    final_discharge_completed = models.BooleanField(default=False)
+    final_discharge_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="completed_discharge_clearances",
+    )
+    final_discharge_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Discharge clearance - {self.admission.admission_number}"
+
+    @property
+    def ready_for_discharge(self):
+        return all([
+            self.clinical_cleared,
+            self.nursing_cleared,
+            self.billing_cleared,
+            self.pharmacy_cleared,
+        ])

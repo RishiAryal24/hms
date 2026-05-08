@@ -26,4 +26,9 @@ export const createIPDVital = (admissionId, data) => api.post(`/inpatient/admiss
 export const getDoctorOrders = (admissionId, params) => api.get(`/inpatient/admissions/${admissionId}/orders/`, { params });
 export const createDoctorOrder = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/orders/`, data);
 export const completeDoctorOrder = (admissionId, orderId) => api.post(`/inpatient/admissions/${admissionId}/orders/${orderId}/complete/`);
+export const getDischargeClearance = (admissionId) => api.get(`/inpatient/admissions/${admissionId}/discharge-clearance/`);
+export const clearClinicalDischarge = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/discharge-clearance/clinical/`, data);
+export const clearNursingDischarge = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/discharge-clearance/nursing/`, data);
+export const clearBillingDischarge = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/discharge-clearance/billing/`, data);
+export const clearPharmacyDischarge = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/discharge-clearance/pharmacy/`, data);
 export const dischargeAdmission = (admissionId, data) => api.post(`/inpatient/admissions/${admissionId}/discharge/`, data);

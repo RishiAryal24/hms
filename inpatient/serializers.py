@@ -2,7 +2,18 @@ from rest_framework import serializers
 
 from patients.models import AdmissionRecord, VitalSign
 from patients.serializers import AdmissionRecordSerializer, PatientListSerializer, VitalSignSerializer
-from .models import Bed, BedAssignment, BedStatus, BedTransfer, DoctorOrder, DoctorRound, NursingRound, Room, Ward
+from .models import (
+    Bed,
+    BedAssignment,
+    BedStatus,
+    BedTransfer,
+    DischargeClearance,
+    DoctorOrder,
+    DoctorRound,
+    NursingRound,
+    Room,
+    Ward,
+)
 
 
 class WardSerializer(serializers.ModelSerializer):
@@ -150,6 +161,39 @@ class AdmissionDischargeSerializer(serializers.Serializer):
     generate_bed_charges = serializers.BooleanField(default=True)
 
 
+class DischargeClearanceSerializer(serializers.ModelSerializer):
+    clinical_cleared_by_name = serializers.CharField(source="clinical_cleared_by.get_full_name", read_only=True)
+    nursing_cleared_by_name = serializers.CharField(source="nursing_cleared_by.get_full_name", read_only=True)
+    billing_cleared_by_name = serializers.CharField(source="billing_cleared_by.get_full_name", read_only=True)
+    pharmacy_cleared_by_name = serializers.CharField(source="pharmacy_cleared_by.get_full_name", read_only=True)
+    final_discharge_by_name = serializers.CharField(source="final_discharge_by.get_full_name", read_only=True)
+    ready_for_discharge = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = DischargeClearance
+        fields = "__all__"
+        read_only_fields = [
+            "admission",
+            "clinical_cleared",
+            "clinical_cleared_by",
+            "clinical_cleared_at",
+            "nursing_cleared",
+            "nursing_cleared_by",
+            "nursing_cleared_at",
+            "billing_cleared",
+            "billing_cleared_by",
+            "billing_cleared_at",
+            "pharmacy_cleared",
+            "pharmacy_cleared_by",
+            "pharmacy_cleared_at",
+            "final_discharge_completed",
+            "final_discharge_by",
+            "final_discharge_at",
+            "created_at",
+            "updated_at",
+        ]
+
+
 class DoctorRoundSerializer(serializers.ModelSerializer):
     admission_number = serializers.CharField(source="admission.admission_number", read_only=True)
     doctor_name = serializers.CharField(source="doctor.get_full_name", read_only=True)
@@ -240,6 +284,7 @@ class IPDAdmissionSerializer(AdmissionRecordSerializer):
     doctor_round_count = serializers.IntegerField(source="doctor_rounds.count", read_only=True)
     active_order_count = serializers.SerializerMethodField()
     latest_vital = serializers.SerializerMethodField()
+    discharge_clearance = DischargeClearanceSerializer(read_only=True)
 
     class Meta(AdmissionRecordSerializer.Meta):
         fields = AdmissionRecordSerializer.Meta.fields
