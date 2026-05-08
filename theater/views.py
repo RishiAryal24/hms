@@ -149,8 +149,8 @@ class TheaterOptionsView(APIView):
         return Response({
             "procedures": ProcedureSerializer(Procedure.objects.filter(is_active=True), many=True).data,
             "rooms": OperatingRoomSerializer(OperatingRoom.objects.filter(is_active=True), many=True).data,
-            "surgeons": StaffOptionSerializer(User.objects.filter(role="doctor", is_active=True), many=True).data,
-            "nurses": StaffOptionSerializer(User.objects.filter(role="nurse", is_active=True), many=True).data,
+            "surgeons": StaffOptionSerializer(User.objects.filter(role__name="doctor", is_active=True), many=True).data,
+            "nurses": StaffOptionSerializer(User.objects.filter(role__name="nurse", is_active=True), many=True).data,
         })
 
 
