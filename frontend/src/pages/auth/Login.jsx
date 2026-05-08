@@ -27,6 +27,7 @@ export default function Login() {
         nurse: "/doctor",
         receptionist: "/reception",
         billing_staff: "/billing",
+        lab_technician: "/lab",
       };
       navigate(redirects[role] || "/reception");
     } catch (err) {

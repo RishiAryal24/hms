@@ -17,6 +17,7 @@ import Staff from "./pages/admin/Staff";
 import IPD from "./pages/admin/IPD";
 import Billing from "./pages/admin/Billing";
 import ClinicalStaff from "./pages/admin/ClinicalStaff";
+import Lab from "./pages/admin/Lab";
 
 function getRole(user) {
   if (!user) return null;
@@ -31,6 +32,7 @@ function getDefaultRoute(user) {
     nurse: "/doctor",
     receptionist: "/reception",
     billing_staff: "/billing",
+    lab_technician: "/lab",
   };
   return map[role] || "/reception";
 }
@@ -62,21 +64,25 @@ export default function App() {
           <Route path="reception/appointments" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><ReceptionAppts /></RequireRole>} />
           <Route path="reception/ipd" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><IPD /></RequireRole>} />
           <Route path="reception/billing" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Billing /></RequireRole>} />
+          <Route path="reception/lab" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Lab /></RequireRole>} />
 
           <Route path="doctor" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorDashboard /></RequireRole>} />
           <Route path="doctor/patients" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorPatients /></RequireRole>} />
           <Route path="doctor/patients/:id" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><PatientDetail /></RequireRole>} />
           <Route path="doctor/appointments" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorAppts /></RequireRole>} />
+          <Route path="doctor/lab" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><Lab /></RequireRole>} />
 
           <Route path="admin" element={<RequireRole allowed={["hospital_admin"]}><AdminDashboard /></RequireRole>} />
           <Route path="admin/staff" element={<RequireRole allowed={["hospital_admin"]}><Staff /></RequireRole>} />
           <Route path="admin/clinical" element={<RequireRole allowed={["hospital_admin"]}><ClinicalStaff /></RequireRole>} />
           <Route path="admin/ipd" element={<RequireRole allowed={["hospital_admin"]}><IPD /></RequireRole>} />
+          <Route path="admin/lab" element={<RequireRole allowed={["hospital_admin"]}><Lab /></RequireRole>} />
           <Route path="admin/billing" element={<RequireRole allowed={["hospital_admin"]}><Billing /></RequireRole>} />
           <Route path="admin/patients" element={<RequireRole allowed={["hospital_admin"]}><DoctorPatients /></RequireRole>} />
           <Route path="admin/patients/:id" element={<RequireRole allowed={["hospital_admin"]}><PatientDetail /></RequireRole>} />
           <Route path="admin/appointments" element={<RequireRole allowed={["hospital_admin"]}><ReceptionAppts /></RequireRole>} />
           <Route path="billing" element={<RequireRole allowed={["billing_staff", "hospital_admin"]}><Billing /></RequireRole>} />
+          <Route path="lab" element={<RequireRole allowed={["lab_technician", "hospital_admin"]}><Lab /></RequireRole>} />
         </Route>
 
         <Route path="*" element={<Navigate to={user ? getDefaultRoute(user) : "/login"} replace />} />
