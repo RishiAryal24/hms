@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import { createStaff, deleteStaff, getRoles, getStaff, resetPassword, updateStaff } from "../../api/auth";
-import { createEmployee, createRoster, getEmployees, getHROptions, getHRSummary, getRosters } from "../../api/hr";
+import {
+  createAttendance,
+  createEmployee,
+  createLeave,
+  createRoster,
+  getAttendance,
+  getEmployees,
+  getHROptions,
+  getHRSummary,
+  getLeaves,
+  getRosters,
+  updateLeave,
+} from "../../api/hr";
 import { Alert, Badge, Btn, Card, Empty, Field, Modal, Spinner, Tabs } from "../../components/ui";
 import useAuthStore from "../../store/authStore";
 
@@ -12,10 +24,16 @@ const LOCATIONS = ["opd", "ipd", "lab", "pharmacy", "ot", "reception", "billing"
 const ROLE_COLOR = { doctor:"var(--blue)", nurse:"var(--purple)", receptionist:"var(--amber)", hospital_admin:"var(--teal)", billing_staff:"var(--green)", pharmacist:"var(--red)", lab_technician:"var(--text-mute)" };
 const STATUS_COLOR = { active: "var(--green)", on_leave: "var(--amber)", suspended: "var(--red)", resigned: "var(--text-mute)" };
 const SHIFT_COLOR = { morning: "var(--blue)", evening: "var(--amber)", night: "var(--purple)", on_call: "var(--green)" };
+const ATTENDANCE_STATUSES = ["present", "absent", "late", "half_day"].map((value) => ({ value, label: value.replace("_", " ") }));
+const ATTENDANCE_COLOR = { present: "var(--green)", absent: "var(--red)", late: "var(--amber)", half_day: "var(--blue)" };
+const LEAVE_TYPES = ["sick", "annual", "emergency", "unpaid", "other"].map((value) => ({ value, label: value }));
+const LEAVE_STATUS_COLOR = { pending: "var(--amber)", approved: "var(--green)", rejected: "var(--red)" };
 
 const emptyStaff = { username:"", password:"", first_name:"", last_name:"", email:"", role:"", phone:"", department:"", employee_id:"", is_tenant_admin: false };
 const emptyEmployee = { user: "", employee_code: "", employment_type: "permanent", status: "active", joining_date: "", designation: "", emergency_contact: "", address: "", notes: "" };
 const emptyRoster = { employee: "", duty_date: "", shift: "morning", location: "opd", department: "", start_time: "", end_time: "", notes: "" };
+const emptyAttendance = { employee: "", roster: "", attendance_date: new Date().toISOString().slice(0, 10), status: "present", check_in: "", check_out: "", notes: "" };
+const emptyLeave = { employee: "", leave_type: "sick", start_date: "", end_date: "", reason: "", status: "pending", decision_notes: "" };
 
 export default function HR() {
   const { user } = useAuthStore();
@@ -25,16 +43,22 @@ export default function HR() {
   const [roles, setRoles] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [rosters, setRosters] = useState([]);
+  const [attendance, setAttendance] = useState([]);
+  const [leaves, setLeaves] = useState([]);
   const [staffOptions, setStaffOptions] = useState([]);
   const [staffModal, setStaffModal] = useState(false);
   const [employeeModal, setEmployeeModal] = useState(false);
   const [rosterModal, setRosterModal] = useState(false);
+  const [attendanceModal, setAttendanceModal] = useState(false);
+  const [leaveModal, setLeaveModal] = useState(false);
   const [staffForm, setStaffForm] = useState(emptyStaff);
   const [staffEditId, setStaffEditId] = useState(null);
   const [resetId, setResetId] = useState(null);
   const [newPw, setNewPw] = useState("");
   const [employeeForm, setEmployeeForm] = useState(emptyEmployee);
   const [rosterForm, setRosterForm] = useState(emptyRoster);
+  const [attendanceForm, setAttendanceForm] = useState(emptyAttendance);
+  const [leaveForm, setLeaveForm] = useState(emptyLeave);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -46,10 +70,12 @@ export default function HR() {
     setLoading(true);
     setError("");
     try {
-      const [summaryRes, employeeRes, rosterRes, optionRes, staffRes, roleRes] = await Promise.all([
+      const [summaryRes, employeeRes, rosterRes, attendanceRes, leaveRes, optionRes, staffRes, roleRes] = await Promise.all([
         getHRSummary(),
         getEmployees(),
         getRosters(),
+        getAttendance(),
+        getLeaves(),
         getHROptions(),
         getStaff(),
         getRoles(),
@@ -57,6 +83,8 @@ export default function HR() {
       setSummary(summaryRes.data);
       setEmployees(employeeRes.data.results || employeeRes.data);
       setRosters(rosterRes.data.results || rosterRes.data);
+      setAttendance(attendanceRes.data.results || attendanceRes.data);
+      setLeaves(leaveRes.data.results || leaveRes.data);
       setStaffOptions(optionRes.data.staff || []);
       setStaff(staffRes.data.results || staffRes.data);
       setRoles(roleRes.data.results || roleRes.data);
@@ -74,6 +102,10 @@ export default function HR() {
   const employeeChoices = employees
     .filter((employee) => employee.status === "active" || employee.status === "on_leave")
     .map((employee) => ({ value: employee.id, label: `${employee.user_detail?.full_name || employee.employee_code} (${employee.employee_code})` }));
+  const rosterChoices = rosters.map((roster) => ({
+    value: roster.id,
+    label: `${roster.employee_detail?.user_detail?.full_name || roster.employee_detail?.employee_code} - ${roster.duty_date} ${roster.shift}`,
+  }));
 
   const handleStaff = (event) => {
     const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
@@ -81,6 +113,8 @@ export default function HR() {
   };
   const handleEmployee = (event) => setEmployeeForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleRoster = (event) => setRosterForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleAttendance = (event) => setAttendanceForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  const handleLeave = (event) => setLeaveForm((current) => ({ ...current, [event.target.name]: event.target.value }));
 
   const openStaffAdd = () => {
     setStaffForm(emptyStaff);
@@ -175,6 +209,54 @@ export default function HR() {
     }
   };
 
+  const saveAttendance = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await createAttendance({
+        ...attendanceForm,
+        roster: attendanceForm.roster || null,
+        check_in: attendanceForm.check_in || null,
+        check_out: attendanceForm.check_out || null,
+      });
+      setAttendanceModal(false);
+      setAttendanceForm(emptyAttendance);
+      setSuccess("Attendance recorded.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveLeave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      await createLeave(leaveForm);
+      setLeaveModal(false);
+      setLeaveForm(emptyLeave);
+      setSuccess("Leave request created.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const decideLeave = async (leave, status) => {
+    setError("");
+    try {
+      await updateLeave(leave.id, { status });
+      setSuccess(`Leave ${status}.`);
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    }
+  };
+
   return (
     <div className="page-enter" style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
@@ -185,7 +267,9 @@ export default function HR() {
         <div style={{ display: "flex", gap: 8 }}>
           {canManage && <Btn variant="secondary" onClick={openStaffAdd}>Add Staff</Btn>}
           {canManage && <Btn variant="secondary" onClick={() => setEmployeeModal(true)}>Add Employee</Btn>}
-          {canManage && <Btn onClick={() => setRosterModal(true)}>Assign Duty</Btn>}
+          {canManage && <Btn variant="secondary" onClick={() => setRosterModal(true)}>Assign Duty</Btn>}
+          {canManage && <Btn variant="secondary" onClick={() => setLeaveModal(true)}>Add Leave</Btn>}
+          {canManage && <Btn onClick={() => setAttendanceModal(true)}>Mark Attendance</Btn>}
         </div>
       </div>
 
@@ -195,18 +279,29 @@ export default function HR() {
       <div className="dashboard-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
         <Card><Metric label="Staff Accounts" value={staff.length} /></Card>
         <Card><Metric label="Active Employees" value={summary?.active || 0} color="var(--green)" /></Card>
-        <Card><Metric label="On Leave" value={summary?.on_leave || 0} color="var(--amber)" /></Card>
-        <Card><Metric label="Roster Entries" value={summary?.rosters || 0} color="var(--blue)" /></Card>
+        <Card><Metric label="Present Today" value={summary?.present_today || 0} color="var(--green)" /></Card>
+        <Card><Metric label="Absent Today" value={summary?.absent_today || 0} color="var(--red)" /></Card>
+        <Card><Metric label="Pending Leave" value={summary?.pending_leave || 0} color="var(--amber)" /></Card>
       </div>
 
-      <Tabs tabs={[{ key: "staff", label: "Staff Accounts" }, { key: "employees", label: "Employees" }, { key: "rosters", label: "Duty Roster" }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[
+        { key: "staff", label: "Staff Accounts" },
+        { key: "employees", label: "Employees" },
+        { key: "rosters", label: "Duty Roster" },
+        { key: "attendance", label: "Attendance" },
+        { key: "leaves", label: "Leave" },
+      ]} active={tab} onChange={setTab} />
 
       {loading ? <Spinner /> : tab === "staff" ? (
         <StaffTable staff={staff} onEdit={openStaffEdit} onReset={setResetId} onDeactivate={deactivateStaff} />
       ) : tab === "employees" ? (
         <EmployeesTable employees={employees} />
-      ) : (
+      ) : tab === "rosters" ? (
         <RostersTable rosters={rosters} />
+      ) : tab === "attendance" ? (
+        <AttendanceTable attendance={attendance} />
+      ) : (
+        <LeaveTable leaves={leaves} onApprove={(leave) => decideLeave(leave, "approved")} onReject={(leave) => decideLeave(leave, "rejected")} />
       )}
 
       <Modal open={staffModal} onClose={() => setStaffModal(false)} title={staffEditId ? "Edit Staff Account" : "Add Staff Account"} width={620}>
@@ -266,6 +361,36 @@ export default function HR() {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Btn variant="secondary" onClick={() => setRosterModal(false)}>Cancel</Btn>
           <Btn onClick={saveRoster} disabled={saving || !rosterForm.employee || !rosterForm.duty_date}>Assign Duty</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={attendanceModal} onClose={() => setAttendanceModal(false)} title="Mark Attendance" width={620}>
+        <Field label="Employee" name="employee" value={attendanceForm.employee} onChange={handleAttendance} options={employeeChoices} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Roster" name="roster" value={attendanceForm.roster} onChange={handleAttendance} options={rosterChoices} />
+          <Field label="Date" name="attendance_date" type="date" value={attendanceForm.attendance_date} onChange={handleAttendance} required />
+          <Field label="Status" name="status" value={attendanceForm.status} onChange={handleAttendance} options={ATTENDANCE_STATUSES} />
+          <Field label="Check In" name="check_in" type="time" value={attendanceForm.check_in} onChange={handleAttendance} />
+          <Field label="Check Out" name="check_out" type="time" value={attendanceForm.check_out} onChange={handleAttendance} />
+        </div>
+        <Field label="Notes" name="notes" value={attendanceForm.notes} onChange={handleAttendance} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setAttendanceModal(false)}>Cancel</Btn>
+          <Btn onClick={saveAttendance} disabled={saving || !attendanceForm.employee || !attendanceForm.attendance_date}>Save Attendance</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={leaveModal} onClose={() => setLeaveModal(false)} title="Create Leave Request" width={620}>
+        <Field label="Employee" name="employee" value={leaveForm.employee} onChange={handleLeave} options={employeeChoices} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Leave Type" name="leave_type" value={leaveForm.leave_type} onChange={handleLeave} options={LEAVE_TYPES} />
+          <Field label="Start Date" name="start_date" type="date" value={leaveForm.start_date} onChange={handleLeave} required />
+          <Field label="End Date" name="end_date" type="date" value={leaveForm.end_date} onChange={handleLeave} required />
+        </div>
+        <Field label="Reason" name="reason" value={leaveForm.reason} onChange={handleLeave} />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setLeaveModal(false)}>Cancel</Btn>
+          <Btn onClick={saveLeave} disabled={saving || !leaveForm.employee || !leaveForm.start_date || !leaveForm.end_date}>Create Leave</Btn>
         </div>
       </Modal>
 
@@ -344,6 +469,61 @@ function RostersTable({ rosters }) {
               <Td>{roster.department || "-"}</Td>
               <Td>{roster.start_time || "-"} - {roster.end_time || "-"}</Td>
               <Td>{roster.assigned_by_name || "-"}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AttendanceTable({ attendance }) {
+  if (!attendance.length) return <Empty icon="AT" message="No attendance records yet" />;
+  return (
+    <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead><tr>{["Date", "Employee", "Status", "Check In", "Check Out", "Recorded By", "Notes"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <tbody>
+          {attendance.map((record) => (
+            <tr key={record.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+              <Td>{record.attendance_date}</Td>
+              <Td>{record.employee_detail?.user_detail?.full_name || "-"}</Td>
+              <Td><Badge label={record.status.replace("_", " ")} color={ATTENDANCE_COLOR[record.status] || "var(--text-mute)"} /></Td>
+              <Td>{record.check_in || "-"}</Td>
+              <Td>{record.check_out || "-"}</Td>
+              <Td>{record.recorded_by_name || "-"}</Td>
+              <Td>{record.notes || "-"}</Td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function LeaveTable({ leaves, onApprove, onReject }) {
+  if (!leaves.length) return <Empty icon="LV" message="No leave requests yet" />;
+  return (
+    <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead><tr>{["Employee", "Type", "Dates", "Status", "Reason", "Approved By", "Actions"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <tbody>
+          {leaves.map((leave) => (
+            <tr key={leave.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+              <Td>{leave.employee_detail?.user_detail?.full_name || "-"}</Td>
+              <Td>{leave.leave_type}</Td>
+              <Td>{leave.start_date} - {leave.end_date}</Td>
+              <Td><Badge label={leave.status} color={LEAVE_STATUS_COLOR[leave.status] || "var(--text-mute)"} /></Td>
+              <Td>{leave.reason || "-"}</Td>
+              <Td>{leave.approved_by_name || "-"}</Td>
+              <Td>
+                {leave.status === "pending" ? (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <Btn size="sm" onClick={() => onApprove(leave)}>Approve</Btn>
+                    <Btn size="sm" variant="danger" onClick={() => onReject(leave)}>Reject</Btn>
+                  </div>
+                ) : "-"}
+              </Td>
             </tr>
           ))}
         </tbody>

@@ -10,3 +10,11 @@ export const updateEmployee = (id, data) => api.patch(`/hr/employees/${id}/`, da
 export const getRosters = (params) => api.get("/hr/rosters/", { params });
 export const createRoster = (data) => api.post("/hr/rosters/", data);
 export const updateRoster = (id, data) => api.patch(`/hr/rosters/${id}/`, data);
+
+export const getAttendance = (params) => api.get("/hr/attendance/", { params });
+export const createAttendance = (data) => api.post("/hr/attendance/", data);
+export const updateAttendance = (id, data) => api.patch(`/hr/attendance/${id}/`, data);
+
+export const getLeaves = (params) => api.get("/hr/leaves/", { params });
+export const createLeave = (data) => api.post("/hr/leaves/", data);
+export const updateLeave = (id, data) => api.patch(`/hr/leaves/${id}/`, data);

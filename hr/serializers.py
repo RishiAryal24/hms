@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from accounts.models import User
 from accounts.serializers import UserSerializer
-from .models import DutyRoster, EmployeeProfile
+from .models import AttendanceRecord, DutyRoster, EmployeeProfile, LeaveRequest
 
 
 class EmployeeProfileSerializer(serializers.ModelSerializer):
@@ -40,6 +40,42 @@ class DutyRosterSerializer(serializers.ModelSerializer):
         end_time = attrs.get("end_time")
         if start_time and end_time and start_time == end_time:
             raise serializers.ValidationError({"end_time": "End time must differ from start time."})
+        return attrs
+
+
+class AttendanceRecordSerializer(serializers.ModelSerializer):
+    employee_detail = EmployeeProfileSerializer(source="employee", read_only=True)
+    roster_detail = DutyRosterSerializer(source="roster", read_only=True)
+    recorded_by_name = serializers.CharField(source="recorded_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = AttendanceRecord
+        fields = "__all__"
+        read_only_fields = ["recorded_by", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        roster = attrs.get("roster")
+        employee = attrs.get("employee")
+        if roster and employee and roster.employee_id != employee.id:
+            raise serializers.ValidationError({"roster": "Roster must belong to selected employee."})
+        return attrs
+
+
+class LeaveRequestSerializer(serializers.ModelSerializer):
+    employee_detail = EmployeeProfileSerializer(source="employee", read_only=True)
+    requested_by_name = serializers.CharField(source="requested_by.get_full_name", read_only=True)
+    approved_by_name = serializers.CharField(source="approved_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = LeaveRequest
+        fields = "__all__"
+        read_only_fields = ["requested_by", "approved_by", "approved_at", "created_at", "updated_at"]
+
+    def validate(self, attrs):
+        start_date = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end_date = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        if start_date and end_date and end_date < start_date:
+            raise serializers.ValidationError({"end_date": "End date cannot be before start date."})
         return attrs
 
 
