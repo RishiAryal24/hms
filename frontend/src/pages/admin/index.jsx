@@ -66,6 +66,7 @@ export default function AdminDashboard() {
         {[
           { label: "Add Staff", to: "/admin/staff", color: "var(--teal)" },
           { label: "Clinical Staff", to: "/admin/clinical", color: "var(--blue)" },
+          { label: "HR", to: "/admin/hr", color: "var(--green)" },
           { label: "Manage IPD", to: "/admin/ipd", color: "var(--blue)" },
           { label: "Lab", to: "/admin/lab", color: "var(--purple)" },
           { label: "Pharmacy", to: "/admin/pharmacy", color: "var(--red)" },

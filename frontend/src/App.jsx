@@ -20,6 +20,7 @@ import ClinicalStaff from "./pages/admin/ClinicalStaff";
 import Lab from "./pages/admin/Lab";
 import Pharmacy from "./pages/admin/Pharmacy";
 import Theater from "./pages/admin/Theater";
+import HR from "./pages/admin/HR";
 
 function getRole(user) {
   if (!user) return null;
@@ -82,6 +83,7 @@ export default function App() {
           <Route path="admin" element={<RequireRole allowed={["hospital_admin"]}><AdminDashboard /></RequireRole>} />
           <Route path="admin/staff" element={<RequireRole allowed={["hospital_admin"]}><Staff /></RequireRole>} />
           <Route path="admin/clinical" element={<RequireRole allowed={["hospital_admin"]}><ClinicalStaff /></RequireRole>} />
+          <Route path="admin/hr" element={<RequireRole allowed={["hospital_admin"]}><HR /></RequireRole>} />
           <Route path="admin/ipd" element={<RequireRole allowed={["hospital_admin"]}><IPD /></RequireRole>} />
           <Route path="admin/lab" element={<RequireRole allowed={["hospital_admin"]}><Lab /></RequireRole>} />
           <Route path="admin/pharmacy" element={<RequireRole allowed={["hospital_admin"]}><Pharmacy /></RequireRole>} />
