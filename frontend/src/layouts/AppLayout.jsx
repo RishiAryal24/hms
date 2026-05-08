@@ -11,6 +11,7 @@ const NAV = {
     { to: "/reception/ipd", icon: "I", label: "IPD" },
     { to: "/reception/lab", icon: "L", label: "Lab" },
     { to: "/reception/pharmacy", icon: "M", label: "Pharmacy" },
+    { to: "/reception/theater", icon: "O", label: "OT" },
     { to: "/reception/billing", icon: "B", label: "Billing" },
   ],
   doctor: [
@@ -19,6 +20,7 @@ const NAV = {
     { to: "/doctor/appointments", icon: "A", label: "Appointments" },
     { to: "/doctor/lab", icon: "L", label: "Lab" },
     { to: "/doctor/pharmacy", icon: "M", label: "Pharmacy" },
+    { to: "/doctor/theater", icon: "O", label: "OT" },
   ],
   hospital_admin: [
     { to: "/admin", icon: "D", label: "Dashboard" },
@@ -27,6 +29,7 @@ const NAV = {
     { to: "/admin/ipd", icon: "I", label: "IPD" },
     { to: "/admin/lab", icon: "L", label: "Lab" },
     { to: "/admin/pharmacy", icon: "M", label: "Pharmacy" },
+    { to: "/admin/theater", icon: "O", label: "OT" },
     { to: "/admin/billing", icon: "B", label: "Billing" },
     { to: "/admin/patients", icon: "P", label: "Patients" },
     { to: "/admin/appointments", icon: "A", label: "Appointments" },
@@ -37,6 +40,7 @@ const NAV = {
     { to: "/doctor/appointments", icon: "A", label: "Appointments" },
     { to: "/doctor/lab", icon: "L", label: "Lab" },
     { to: "/doctor/pharmacy", icon: "M", label: "Pharmacy" },
+    { to: "/doctor/theater", icon: "O", label: "OT" },
   ],
   billing_staff: [
     { to: "/billing", icon: "B", label: "Billing" },

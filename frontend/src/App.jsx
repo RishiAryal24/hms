@@ -19,6 +19,7 @@ import Billing from "./pages/admin/Billing";
 import ClinicalStaff from "./pages/admin/ClinicalStaff";
 import Lab from "./pages/admin/Lab";
 import Pharmacy from "./pages/admin/Pharmacy";
+import Theater from "./pages/admin/Theater";
 
 function getRole(user) {
   if (!user) return null;
@@ -68,6 +69,7 @@ export default function App() {
           <Route path="reception/billing" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Billing /></RequireRole>} />
           <Route path="reception/lab" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Lab /></RequireRole>} />
           <Route path="reception/pharmacy" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Pharmacy /></RequireRole>} />
+          <Route path="reception/theater" element={<RequireRole allowed={["receptionist", "hospital_admin"]}><Theater /></RequireRole>} />
 
           <Route path="doctor" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorDashboard /></RequireRole>} />
           <Route path="doctor/patients" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorPatients /></RequireRole>} />
@@ -75,6 +77,7 @@ export default function App() {
           <Route path="doctor/appointments" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><DoctorAppts /></RequireRole>} />
           <Route path="doctor/lab" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><Lab /></RequireRole>} />
           <Route path="doctor/pharmacy" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><Pharmacy /></RequireRole>} />
+          <Route path="doctor/theater" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><Theater /></RequireRole>} />
 
           <Route path="admin" element={<RequireRole allowed={["hospital_admin"]}><AdminDashboard /></RequireRole>} />
           <Route path="admin/staff" element={<RequireRole allowed={["hospital_admin"]}><Staff /></RequireRole>} />
@@ -82,6 +85,7 @@ export default function App() {
           <Route path="admin/ipd" element={<RequireRole allowed={["hospital_admin"]}><IPD /></RequireRole>} />
           <Route path="admin/lab" element={<RequireRole allowed={["hospital_admin"]}><Lab /></RequireRole>} />
           <Route path="admin/pharmacy" element={<RequireRole allowed={["hospital_admin"]}><Pharmacy /></RequireRole>} />
+          <Route path="admin/theater" element={<RequireRole allowed={["hospital_admin"]}><Theater /></RequireRole>} />
           <Route path="admin/billing" element={<RequireRole allowed={["hospital_admin"]}><Billing /></RequireRole>} />
           <Route path="admin/patients" element={<RequireRole allowed={["hospital_admin"]}><DoctorPatients /></RequireRole>} />
           <Route path="admin/patients/:id" element={<RequireRole allowed={["hospital_admin"]}><PatientDetail /></RequireRole>} />
