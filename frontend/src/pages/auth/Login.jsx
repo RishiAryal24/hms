@@ -28,6 +28,7 @@ export default function Login() {
         receptionist: "/reception",
         billing_staff: "/billing",
         lab_technician: "/lab",
+        pharmacist: "/pharmacy",
       };
       navigate(redirects[role] || "/reception");
     } catch (err) {

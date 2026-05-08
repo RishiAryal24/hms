@@ -68,6 +68,7 @@ export default function AdminDashboard() {
           { label: "Clinical Staff", to: "/admin/clinical", color: "var(--blue)" },
           { label: "Manage IPD", to: "/admin/ipd", color: "var(--blue)" },
           { label: "Lab", to: "/admin/lab", color: "var(--purple)" },
+          { label: "Pharmacy", to: "/admin/pharmacy", color: "var(--red)" },
           { label: "Billing", to: "/admin/billing", color: "var(--green)" },
           { label: "View Patients", to: "/admin/patients", color: "var(--purple)" },
           { label: "Appointments", to: "/admin/appointments", color: "var(--amber)" },

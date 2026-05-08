@@ -54,6 +54,7 @@ TENANT_APPS = [
     "billing",
     "clinical",
     "lab",
+    "pharmacy",
     "core",
 ]
 
