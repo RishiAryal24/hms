@@ -13,10 +13,8 @@ import DoctorAppts from "./pages/doctor/Appointments";
 import PatientDetail from "./pages/doctor/PatientDetail";
 
 import AdminDashboard from "./pages/admin/index";
-import Staff from "./pages/admin/Staff";
 import IPD from "./pages/admin/IPD";
 import Billing from "./pages/admin/Billing";
-import ClinicalStaff from "./pages/admin/ClinicalStaff";
 import Lab from "./pages/admin/Lab";
 import Pharmacy from "./pages/admin/Pharmacy";
 import Theater from "./pages/admin/Theater";
@@ -81,8 +79,8 @@ export default function App() {
           <Route path="doctor/theater" element={<RequireRole allowed={["doctor", "nurse", "hospital_admin"]}><Theater /></RequireRole>} />
 
           <Route path="admin" element={<RequireRole allowed={["hospital_admin"]}><AdminDashboard /></RequireRole>} />
-          <Route path="admin/staff" element={<RequireRole allowed={["hospital_admin"]}><Staff /></RequireRole>} />
-          <Route path="admin/clinical" element={<RequireRole allowed={["hospital_admin"]}><ClinicalStaff /></RequireRole>} />
+          <Route path="admin/staff" element={<Navigate to="/admin/hr" replace />} />
+          <Route path="admin/clinical" element={<Navigate to="/admin/hr" replace />} />
           <Route path="admin/hr" element={<RequireRole allowed={["hospital_admin"]}><HR /></RequireRole>} />
           <Route path="admin/ipd" element={<RequireRole allowed={["hospital_admin"]}><IPD /></RequireRole>} />
           <Route path="admin/lab" element={<RequireRole allowed={["hospital_admin"]}><Lab /></RequireRole>} />

@@ -24,8 +24,6 @@ const NAV = {
   ],
   hospital_admin: [
     { to: "/admin", icon: "D", label: "Dashboard" },
-    { to: "/admin/staff", icon: "S", label: "Staff" },
-    { to: "/admin/clinical", icon: "C", label: "Clinical" },
     { to: "/admin/hr", icon: "H", label: "HR" },
     { to: "/admin/ipd", icon: "I", label: "IPD" },
     { to: "/admin/lab", icon: "L", label: "Lab" },

@@ -64,8 +64,6 @@ export default function AdminDashboard() {
 
       <div className="quick-actions" style={{ display: "flex", gap: 12, marginBottom: 28 }}>
         {[
-          { label: "Add Staff", to: "/admin/staff", color: "var(--teal)" },
-          { label: "Clinical Staff", to: "/admin/clinical", color: "var(--blue)" },
           { label: "HR", to: "/admin/hr", color: "var(--green)" },
           { label: "Manage IPD", to: "/admin/ipd", color: "var(--blue)" },
           { label: "Lab", to: "/admin/lab", color: "var(--purple)" },
@@ -85,7 +83,7 @@ export default function AdminDashboard() {
 
       <div className="split-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
         <Card title="Staff" action={
-          <button onClick={() => navigate("/admin/staff")}
+          <button onClick={() => navigate("/admin/hr")}
             style={{ fontSize: 12, color: "var(--teal)", background: "none", border: "none", cursor: "pointer" }}>
             Manage
           </button>

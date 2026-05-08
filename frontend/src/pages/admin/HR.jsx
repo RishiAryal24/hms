@@ -1,77 +1,38 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  createEmployee,
-  createRoster,
-  getEmployees,
-  getHROptions,
-  getHRSummary,
-  getRosters,
-} from "../../api/hr";
+import { createStaff, deleteStaff, getRoles, getStaff, resetPassword, updateStaff } from "../../api/auth";
+import { createEmployee, createRoster, getEmployees, getHROptions, getHRSummary, getRosters } from "../../api/hr";
 import { Alert, Badge, Btn, Card, Empty, Field, Modal, Spinner, Tabs } from "../../components/ui";
 import useAuthStore from "../../store/authStore";
 
-const EMPLOYMENT_TYPES = [
-  "permanent", "contract", "visiting", "intern", "other",
-].map((value) => ({ value, label: value.replace("_", " ") }));
+const EMPLOYMENT_TYPES = ["permanent", "contract", "visiting", "intern", "other"].map((value) => ({ value, label: value.replace("_", " ") }));
+const EMPLOYMENT_STATUSES = ["active", "on_leave", "suspended", "resigned"].map((value) => ({ value, label: value.replace("_", " ") }));
+const SHIFTS = ["morning", "evening", "night", "on_call"].map((value) => ({ value, label: value.replace("_", " ") }));
+const LOCATIONS = ["opd", "ipd", "lab", "pharmacy", "ot", "reception", "billing", "admin", "other"].map((value) => ({ value, label: value.toUpperCase() }));
 
-const EMPLOYMENT_STATUSES = [
-  "active", "on_leave", "suspended", "resigned",
-].map((value) => ({ value, label: value.replace("_", " ") }));
+const ROLE_COLOR = { doctor:"var(--blue)", nurse:"var(--purple)", receptionist:"var(--amber)", hospital_admin:"var(--teal)", billing_staff:"var(--green)", pharmacist:"var(--red)", lab_technician:"var(--text-mute)" };
+const STATUS_COLOR = { active: "var(--green)", on_leave: "var(--amber)", suspended: "var(--red)", resigned: "var(--text-mute)" };
+const SHIFT_COLOR = { morning: "var(--blue)", evening: "var(--amber)", night: "var(--purple)", on_call: "var(--green)" };
 
-const SHIFTS = [
-  "morning", "evening", "night", "on_call",
-].map((value) => ({ value, label: value.replace("_", " ") }));
-
-const LOCATIONS = [
-  "opd", "ipd", "lab", "pharmacy", "ot", "reception", "billing", "admin", "other",
-].map((value) => ({ value, label: value.toUpperCase() }));
-
-const STATUS_COLOR = {
-  active: "var(--green)",
-  on_leave: "var(--amber)",
-  suspended: "var(--red)",
-  resigned: "var(--text-mute)",
-};
-
-const SHIFT_COLOR = {
-  morning: "var(--blue)",
-  evening: "var(--amber)",
-  night: "var(--purple)",
-  on_call: "var(--green)",
-};
-
-const emptyEmployee = {
-  user: "",
-  employee_code: "",
-  employment_type: "permanent",
-  status: "active",
-  joining_date: "",
-  designation: "",
-  emergency_contact: "",
-  address: "",
-  notes: "",
-};
-
-const emptyRoster = {
-  employee: "",
-  duty_date: "",
-  shift: "morning",
-  location: "opd",
-  department: "",
-  start_time: "",
-  end_time: "",
-  notes: "",
-};
+const emptyStaff = { username:"", password:"", first_name:"", last_name:"", email:"", role:"", phone:"", department:"", employee_id:"", is_tenant_admin: false };
+const emptyEmployee = { user: "", employee_code: "", employment_type: "permanent", status: "active", joining_date: "", designation: "", emergency_contact: "", address: "", notes: "" };
+const emptyRoster = { employee: "", duty_date: "", shift: "morning", location: "opd", department: "", start_time: "", end_time: "", notes: "" };
 
 export default function HR() {
   const { user } = useAuthStore();
-  const [tab, setTab] = useState("employees");
+  const [tab, setTab] = useState("staff");
   const [summary, setSummary] = useState(null);
+  const [staff, setStaff] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [rosters, setRosters] = useState([]);
   const [staffOptions, setStaffOptions] = useState([]);
+  const [staffModal, setStaffModal] = useState(false);
   const [employeeModal, setEmployeeModal] = useState(false);
   const [rosterModal, setRosterModal] = useState(false);
+  const [staffForm, setStaffForm] = useState(emptyStaff);
+  const [staffEditId, setStaffEditId] = useState(null);
+  const [resetId, setResetId] = useState(null);
+  const [newPw, setNewPw] = useState("");
   const [employeeForm, setEmployeeForm] = useState(emptyEmployee);
   const [rosterForm, setRosterForm] = useState(emptyRoster);
   const [loading, setLoading] = useState(true);
@@ -85,16 +46,20 @@ export default function HR() {
     setLoading(true);
     setError("");
     try {
-      const [summaryRes, employeeRes, rosterRes, optionRes] = await Promise.all([
+      const [summaryRes, employeeRes, rosterRes, optionRes, staffRes, roleRes] = await Promise.all([
         getHRSummary(),
         getEmployees(),
         getRosters(),
         getHROptions(),
+        getStaff(),
+        getRoles(),
       ]);
       setSummary(summaryRes.data);
       setEmployees(employeeRes.data.results || employeeRes.data);
       setRosters(rosterRes.data.results || rosterRes.data);
       setStaffOptions(optionRes.data.staff || []);
+      setStaff(staffRes.data.results || staffRes.data);
+      setRoles(roleRes.data.results || roleRes.data);
     } catch {
       setError("Unable to load HR data.");
     } finally {
@@ -104,20 +69,79 @@ export default function HR() {
 
   useEffect(() => { load(); }, [load]);
 
-  const staffChoices = staffOptions.map((staff) => ({
-    value: staff.id,
-    label: `${staff.full_name || staff.username} (${staff.role_display || staff.role_name || "Staff"})`,
-  }));
-
+  const roleChoices = roles.map((role) => ({ value: role.id, label: role.get_name_display || role.name }));
+  const staffChoices = staffOptions.map((person) => ({ value: person.id, label: `${person.full_name || person.username} (${person.role_display || person.role_name || "Staff"})` }));
   const employeeChoices = employees
     .filter((employee) => employee.status === "active" || employee.status === "on_leave")
-    .map((employee) => ({
-      value: employee.id,
-      label: `${employee.user_detail?.full_name || employee.employee_code} (${employee.employee_code})`,
-    }));
+    .map((employee) => ({ value: employee.id, label: `${employee.user_detail?.full_name || employee.employee_code} (${employee.employee_code})` }));
 
+  const handleStaff = (event) => {
+    const value = event.target.type === "checkbox" ? event.target.checked : event.target.value;
+    setStaffForm((current) => ({ ...current, [event.target.name]: value }));
+  };
   const handleEmployee = (event) => setEmployeeForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   const handleRoster = (event) => setRosterForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+
+  const openStaffAdd = () => {
+    setStaffForm(emptyStaff);
+    setStaffEditId(null);
+    setStaffModal(true);
+  };
+
+  const openStaffEdit = (person) => {
+    setStaffForm({ ...person, password: "", role: person.role || "" });
+    setStaffEditId(person.id);
+    setStaffModal(true);
+  };
+
+  const saveStaff = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      if (staffEditId) {
+        const payload = { ...staffForm };
+        delete payload.username;
+        delete payload.password;
+        await updateStaff(staffEditId, payload);
+        setSuccess("Staff account updated.");
+      } else {
+        await createStaff(staffForm);
+        setSuccess("Staff account created.");
+      }
+      setStaffModal(false);
+      setStaffForm(emptyStaff);
+      setStaffEditId(null);
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deactivateStaff = async (person) => {
+    if (!confirm(`Deactivate ${person.full_name || person.username}?`)) return;
+    setError("");
+    try {
+      await deleteStaff(person.id);
+      setSuccess("Staff account deactivated.");
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    }
+  };
+
+  const saveResetPassword = async () => {
+    setError("");
+    try {
+      await resetPassword(resetId, { new_password: newPw });
+      setResetId(null);
+      setNewPw("");
+      setSuccess("Password reset successfully.");
+    } catch (err) {
+      setError(formatError(err));
+    }
+  };
 
   const saveEmployee = async () => {
     setSaving(true);
@@ -139,11 +163,7 @@ export default function HR() {
     setSaving(true);
     setError("");
     try {
-      await createRoster({
-        ...rosterForm,
-        start_time: rosterForm.start_time || null,
-        end_time: rosterForm.end_time || null,
-      });
+      await createRoster({ ...rosterForm, start_time: rosterForm.start_time || null, end_time: rosterForm.end_time || null });
       setRosterModal(false);
       setRosterForm(emptyRoster);
       setSuccess("Duty roster assigned.");
@@ -160,9 +180,10 @@ export default function HR() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 800, fontFamily: "var(--font-display)" }}>HR</div>
-          <div style={{ fontSize: 13, color: "var(--text-mute)", marginTop: 2 }}>Employee profiles, employment status, and duty rosters</div>
+          <div style={{ fontSize: 13, color: "var(--text-mute)", marginTop: 2 }}>Staff accounts, employee profiles, employment status, and duty rosters</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          {canManage && <Btn variant="secondary" onClick={openStaffAdd}>Add Staff</Btn>}
           {canManage && <Btn variant="secondary" onClick={() => setEmployeeModal(true)}>Add Employee</Btn>}
           {canManage && <Btn onClick={() => setRosterModal(true)}>Assign Duty</Btn>}
         </div>
@@ -172,23 +193,49 @@ export default function HR() {
       {success && <Alert message={success} type="success" />}
 
       <div className="dashboard-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-        <Card><Metric label="Employees" value={summary?.employees || 0} /></Card>
-        <Card><Metric label="Active" value={summary?.active || 0} color="var(--green)" /></Card>
+        <Card><Metric label="Staff Accounts" value={staff.length} /></Card>
+        <Card><Metric label="Active Employees" value={summary?.active || 0} color="var(--green)" /></Card>
         <Card><Metric label="On Leave" value={summary?.on_leave || 0} color="var(--amber)" /></Card>
         <Card><Metric label="Roster Entries" value={summary?.rosters || 0} color="var(--blue)" /></Card>
       </div>
 
-      <Tabs tabs={[{ key: "employees", label: "Employees" }, { key: "rosters", label: "Duty Roster" }]} active={tab} onChange={setTab} />
+      <Tabs tabs={[{ key: "staff", label: "Staff Accounts" }, { key: "employees", label: "Employees" }, { key: "rosters", label: "Duty Roster" }]} active={tab} onChange={setTab} />
 
-      {loading ? <Spinner /> : tab === "employees" ? (
+      {loading ? <Spinner /> : tab === "staff" ? (
+        <StaffTable staff={staff} onEdit={openStaffEdit} onReset={setResetId} onDeactivate={deactivateStaff} />
+      ) : tab === "employees" ? (
         <EmployeesTable employees={employees} />
       ) : (
         <RostersTable rosters={rosters} />
       )}
 
+      <Modal open={staffModal} onClose={() => setStaffModal(false)} title={staffEditId ? "Edit Staff Account" : "Add Staff Account"} width={620}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          {!staffEditId && <Field label="Username" name="username" value={staffForm.username} onChange={handleStaff} required />}
+          {!staffEditId && <Field label="Password" name="password" value={staffForm.password} onChange={handleStaff} type="password" required />}
+          <Field label="First Name" name="first_name" value={staffForm.first_name} onChange={handleStaff} required />
+          <Field label="Last Name" name="last_name" value={staffForm.last_name} onChange={handleStaff} required />
+          <Field label="Email" name="email" value={staffForm.email} onChange={handleStaff} type="email" />
+          <Field label="Role" name="role" value={staffForm.role} onChange={handleStaff} options={roleChoices} />
+          <Field label="Phone" name="phone" value={staffForm.phone} onChange={handleStaff} />
+          <Field label="Department" name="department" value={staffForm.department} onChange={handleStaff} />
+          <Field label="Employee ID" name="employee_id" value={staffForm.employee_id} onChange={handleStaff} />
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, color: "var(--text-mute)", fontSize: 13 }}>
+          <input type="checkbox" name="is_tenant_admin" checked={staffForm.is_tenant_admin} onChange={handleStaff} />
+          Hospital admin
+        </label>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setStaffModal(false)}>Cancel</Btn>
+          <Btn onClick={saveStaff} disabled={saving || !staffForm.first_name || !staffForm.last_name || (!staffEditId && (!staffForm.username || !staffForm.password))}>
+            {staffEditId ? "Update Staff" : "Create Staff"}
+          </Btn>
+        </div>
+      </Modal>
+
       <Modal open={employeeModal} onClose={() => setEmployeeModal(false)} title="Add Employee Profile" width={640}>
         <Field label="Staff User" name="user" value={employeeForm.user} onChange={handleEmployee} options={staffChoices} required />
-        {!staffChoices.length && <Alert type="warning" message="All active staff already have HR profiles. Create staff from Staff module first." />}
+        {!staffChoices.length && <Alert type="warning" message="All active staff already have HR profiles. Create staff from HR staff accounts first." />}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <Field label="Employee Code" name="employee_code" value={employeeForm.employee_code} onChange={handleEmployee} required />
           <Field label="Designation" name="designation" value={employeeForm.designation} onChange={handleEmployee} />
@@ -221,6 +268,38 @@ export default function HR() {
           <Btn onClick={saveRoster} disabled={saving || !rosterForm.employee || !rosterForm.duty_date}>Assign Duty</Btn>
         </div>
       </Modal>
+
+      <Modal open={!!resetId} onClose={() => setResetId(null)} title="Reset Password" width={420}>
+        <Field label="New Password" name="new_password" value={newPw} onChange={(event) => setNewPw(event.target.value)} type="password" required />
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <Btn variant="secondary" onClick={() => setResetId(null)}>Cancel</Btn>
+          <Btn onClick={saveResetPassword} disabled={newPw.length < 8}>Reset Password</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function StaffTable({ staff, onEdit, onReset, onDeactivate }) {
+  if (!staff.length) return <Empty icon="ST" message="No staff accounts yet" />;
+  return (
+    <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead><tr>{["Name", "Username", "Role", "Department", "Employee ID", "Status", "Actions"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+        <tbody>
+          {staff.map((person) => (
+            <tr key={person.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+              <Td><div style={{ fontWeight: 700, color: "var(--card-ink)" }}>{person.full_name || person.username}</div><div style={{ color: "var(--text-mute)", fontSize: 12 }}>{person.email || "-"}</div></Td>
+              <Td>{person.username}</Td>
+              <Td><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><Badge label={person.role_display || person.role_name || "-"} color={ROLE_COLOR[person.role_name] || "var(--text-mute)"} />{person.is_tenant_admin && <Badge label="admin" color="var(--teal)" />}</div></Td>
+              <Td>{person.department || "-"}</Td>
+              <Td>{person.employee_id || "-"}</Td>
+              <Td><Badge label={person.is_active ? "active" : "inactive"} color={person.is_active ? "var(--green)" : "var(--text-mute)"} /></Td>
+              <Td><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}><Btn size="sm" variant="secondary" onClick={() => onEdit(person)}>Edit</Btn><Btn size="sm" variant="ghost" onClick={() => onReset(person.id)}>Reset PW</Btn>{person.is_active && <Btn size="sm" variant="danger" onClick={() => onDeactivate(person)}>Deactivate</Btn>}</div></Td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -235,10 +314,7 @@ function EmployeesTable({ employees }) {
           {employees.map((employee) => (
             <tr key={employee.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
               <Td>{employee.employee_code}</Td>
-              <Td>
-                <div style={{ fontWeight: 700, color: "var(--card-ink)" }}>{employee.user_detail?.full_name || employee.user_detail?.username}</div>
-                <div style={{ color: "var(--text-mute)", fontSize: 12 }}>{employee.user_detail?.email || "-"}</div>
-              </Td>
+              <Td><div style={{ fontWeight: 700, color: "var(--card-ink)" }}>{employee.user_detail?.full_name || employee.user_detail?.username}</div><div style={{ color: "var(--text-mute)", fontSize: 12 }}>{employee.user_detail?.email || "-"}</div></Td>
               <Td>{employee.user_detail?.role_display || employee.role_name || "-"}</Td>
               <Td>{employee.designation || "-"}</Td>
               <Td>{employee.employment_type}</Td>
@@ -262,10 +338,7 @@ function RostersTable({ rosters }) {
           {rosters.map((roster) => (
             <tr key={roster.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
               <Td>{roster.duty_date}</Td>
-              <Td>
-                <div style={{ fontWeight: 700, color: "var(--card-ink)" }}>{roster.employee_detail?.user_detail?.full_name || "-"}</div>
-                <div style={{ color: "var(--text-mute)", fontSize: 12 }}>{roster.employee_detail?.employee_code || "-"}</div>
-              </Td>
+              <Td><div style={{ fontWeight: 700, color: "var(--card-ink)" }}>{roster.employee_detail?.user_detail?.full_name || "-"}</div><div style={{ color: "var(--text-mute)", fontSize: 12 }}>{roster.employee_detail?.employee_code || "-"}</div></Td>
               <Td><Badge label={roster.shift.replace("_", " ")} color={SHIFT_COLOR[roster.shift] || "var(--text-mute)"} /></Td>
               <Td>{roster.location.toUpperCase()}</Td>
               <Td>{roster.department || "-"}</Td>
@@ -280,12 +353,7 @@ function RostersTable({ rosters }) {
 }
 
 function Metric({ label, value, color = "var(--teal)" }) {
-  return (
-    <div>
-      <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "var(--font-display)" }}>{value}</div>
-      <div style={{ color: "var(--text-mute)", fontSize: 12 }}>{label}</div>
-    </div>
-  );
+  return <div><div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: "var(--font-display)" }}>{value}</div><div style={{ color: "var(--text-mute)", fontSize: 12 }}>{label}</div></div>;
 }
 
 function Th({ children }) {
