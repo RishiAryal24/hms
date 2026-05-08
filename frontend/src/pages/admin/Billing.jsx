@@ -8,6 +8,7 @@ import {
   getChargeItems,
   getInvoice,
   getInvoices,
+  getPatientStatement,
   issueInvoice,
 } from "../../api/billing";
 import { getPatients } from "../../api/patients";
@@ -47,9 +48,12 @@ export default function Billing() {
   const [success, setSuccess] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [detailInvoice, setDetailInvoice] = useState(null);
+  const [statement, setStatement] = useState(null);
   const [patientFilter, setPatientFilter] = useState("");
+  const [statementPatient, setStatementPatient] = useState("");
   const [invoiceModal, setInvoiceModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
+  const [statementModal, setStatementModal] = useState(false);
   const [chargeModal, setChargeModal] = useState(false);
   const [lineModal, setLineModal] = useState(false);
   const [paymentModal, setPaymentModal] = useState(false);
@@ -286,6 +290,83 @@ export default function Billing() {
     popup.document.close();
   };
 
+  const loadStatement = async () => {
+    if (!statementPatient) return;
+    setError("");
+    try {
+      const { data } = await getPatientStatement(statementPatient);
+      setStatement(data);
+      setStatementModal(true);
+    } catch {
+      setError("Unable to load patient statement.");
+    }
+  };
+
+  const printStatement = (data) => {
+    const categoryBlocks = (data.categories || []).map((category) => `
+      <h2>${category.category}</h2>
+      <table>
+        <thead><tr><th>Date</th><th>Invoice</th><th>Description</th><th>Qty</th><th>Rate</th><th>Total</th></tr></thead>
+        <tbody>
+          ${category.lines.map((line) => `
+            <tr>
+              <td>${new Date(line.date).toLocaleDateString()}</td>
+              <td>${line.invoice_number}</td>
+              <td>${line.description}</td>
+              <td>${line.quantity}</td>
+              <td>Rs. ${line.unit_price}</td>
+              <td>Rs. ${line.line_total}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+        <tfoot><tr><td colspan="5"><strong>${category.category} total</strong></td><td><strong>Rs. ${category.total}</strong></td></tr></tfoot>
+      </table>
+    `).join("");
+    const popup = window.open("", "_blank", "width=980,height=760");
+    popup.document.write(`
+      <html>
+        <head>
+          <title>Patient Statement</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 28px; color: #111827; }
+            h1 { margin: 0 0 4px; font-size: 24px; }
+            h2 { margin-top: 26px; font-size: 17px; text-transform: capitalize; }
+            .muted { color: #6b7280; font-size: 13px; }
+            .top { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+            th, td { border-bottom: 1px solid #e5e7eb; padding: 9px; text-align: left; font-size: 13px; }
+            th { color: #6b7280; text-transform: uppercase; font-size: 11px; }
+            tfoot td { background: #f9fafb; }
+            .totals { margin-left: auto; width: 300px; margin-top: 24px; }
+            .totals div { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #e5e7eb; }
+            @media print { button { display: none; } }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()">Print</button>
+          <div class="top">
+            <div>
+              <h1>Butwal Hospital</h1>
+              <div class="muted">Patient Statement</div>
+            </div>
+            <div>
+              <strong>${data.patient?.full_name || "-"}</strong>
+              <div class="muted">${data.patient?.patient_id || ""}</div>
+              <div class="muted">${new Date().toLocaleString()}</div>
+            </div>
+          </div>
+          ${categoryBlocks || "<p>No billable charges found.</p>"}
+          <div class="totals">
+            <div><span>Total billed</span><strong>Rs. ${data.totals?.billed || 0}</strong></div>
+            <div><span>Total paid</span><strong>Rs. ${data.totals?.paid || 0}</strong></div>
+            <div><span>Amount due</span><strong>Rs. ${data.totals?.balance || 0}</strong></div>
+          </div>
+        </body>
+      </html>
+    `);
+    popup.document.close();
+  };
+
   return (
     <div className="page-enter" style={{ padding: 28 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 24 }}>
@@ -294,6 +375,7 @@ export default function Billing() {
           <div style={{ fontSize: 13, color: "var(--text-mute)", marginTop: 2 }}>Invoices, charges, and payments</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="secondary" onClick={() => setStatementModal(true)}>Patient Statement</Btn>
           {canConfigureCharges && <Btn variant="secondary" onClick={() => setChargeModal(true)}>Add Charge</Btn>}
           <Btn onClick={() => setInvoiceModal(true)}>New Invoice</Btn>
         </div>
@@ -392,6 +474,17 @@ export default function Billing() {
             <PaymentsTable payments={detailInvoice.payments || []} />
           </>
         )}
+      </Modal>
+
+      <Modal open={statementModal} onClose={() => setStatementModal(false)} title="Patient Statement" width={920}>
+        <div style={{ display: "flex", gap: 10, alignItems: "end", marginBottom: 18 }}>
+          <div style={{ flex: 1 }}>
+            <Field label="Patient" name="statement_patient" value={statementPatient} onChange={(event) => setStatementPatient(event.target.value)} options={patientOptions} />
+          </div>
+          <Btn onClick={loadStatement} disabled={!statementPatient}>Load</Btn>
+          {statement && <Btn variant="secondary" onClick={() => printStatement(statement)}>Print</Btn>}
+        </div>
+        {statement ? <StatementView statement={statement} /> : <Empty icon="ST" message="Select a patient to view statement" />}
       </Modal>
     </div>
   );
@@ -502,6 +595,44 @@ function PaymentsTable({ payments }) {
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatementView({ statement }) {
+  const categories = statement.categories || [];
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 18 }}>
+        <Card><Metric label="Billed" value={`Rs. ${statement.totals?.billed || 0}`} color="var(--blue)" /></Card>
+        <Card><Metric label="Paid" value={`Rs. ${statement.totals?.paid || 0}`} color="var(--green)" /></Card>
+        <Card><Metric label="Due" value={`Rs. ${statement.totals?.balance || 0}`} color="var(--amber)" /></Card>
+      </div>
+      {!categories.length ? <Empty icon="BL" message="No billable charges found" /> : categories.map((category) => (
+        <div key={category.category} style={{ marginBottom: 18 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <div style={{ fontWeight: 800, textTransform: "capitalize" }}>{category.category}</div>
+            <div style={{ fontWeight: 800, color: "var(--teal)" }}>Rs. {category.total}</div>
+          </div>
+          <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>{["Date", "Invoice", "Description", "Qty", "Rate", "Total"].map((head) => <Th key={head}>{head}</Th>)}</tr></thead>
+              <tbody>
+                {category.lines.map((line) => (
+                  <tr key={line.id} style={{ borderBottom: "1px solid var(--border-light)" }}>
+                    <Td>{new Date(line.date).toLocaleDateString()}</Td>
+                    <Td>{line.invoice_number}</Td>
+                    <Td>{line.description}</Td>
+                    <Td>{line.quantity}</Td>
+                    <Td>Rs. {line.unit_price}</Td>
+                    <Td>Rs. {line.line_total}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

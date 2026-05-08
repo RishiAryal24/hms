@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from shared.permissions import IsTenantAdmin, role_required
+from patients.models import Patient
 from .models import ChargeItem, Invoice, InvoiceLine, Payment
 from .serializers import (
     ChargeItemSerializer,
@@ -12,6 +13,7 @@ from .serializers import (
     InvoiceLineSerializer,
     InvoiceSerializer,
     PaymentSerializer,
+    PatientStatementSerializer,
 )
 
 
@@ -137,3 +139,11 @@ class BillingSummaryView(APIView):
             "draft_count": Invoice.objects.filter(status="draft").count(),
             "unpaid_count": Invoice.objects.exclude(status__in=["paid", "cancelled"]).count(),
         })
+
+
+class PatientStatementView(APIView):
+    permission_classes = [CanViewBilling]
+
+    def get(self, request, patient_pk):
+        patient = Patient.objects.get(pk=patient_pk)
+        return Response(PatientStatementSerializer(patient).data)

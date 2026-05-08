@@ -92,6 +92,7 @@ export default function Lab() {
     () => tests.filter((test) => orderForm.tests.includes(String(test.id))),
     [tests, orderForm.tests],
   );
+  const selectedTotal = selectedTests.reduce((sum, test) => sum + Number(test.price || 0), 0);
 
   const handleOrder = (event) => {
     if (event.target.name === "tests") {
@@ -223,7 +224,12 @@ export default function Lab() {
             {testOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
-        {selectedTests.length > 0 && <Alert type="info" message={`${selectedTests.length} tests selected. Charges will be added to Billing.`} />}
+        {selectedTests.length > 0 && (
+          <Alert
+            type={selectedTotal > 0 ? "info" : "warning"}
+            message={`${selectedTests.length} tests selected. Billing total: Rs. ${selectedTotal}. Tests priced at Rs. 0 will not create payable charges.`}
+          />
+        )}
         <Field label="Clinical Notes" name="clinical_notes" value={orderForm.clinical_notes} onChange={handleOrder} />
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Btn variant="secondary" onClick={() => setOrderModal(false)}>Cancel</Btn>

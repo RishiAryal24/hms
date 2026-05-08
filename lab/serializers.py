@@ -13,6 +13,11 @@ class LabTestSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["created_at", "updated_at"]
 
+    def validate_price(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Price cannot be negative.")
+        return value
+
 
 class LabOrderItemSerializer(serializers.ModelSerializer):
     test_detail = LabTestSerializer(source="test", read_only=True)
@@ -55,6 +60,8 @@ class LabOrderCreateSerializer(serializers.ModelSerializer):
         patient = attrs.get("patient")
         if admission and admission.patient_id != patient.id:
             raise serializers.ValidationError({"admission": "Admission must belong to the selected patient."})
+        if not any(test.price > 0 for test in attrs.get("tests", [])):
+            raise serializers.ValidationError({"tests": "At least one selected lab test must have a price greater than zero to create billing."})
         return attrs
 
     def create(self, validated_data):

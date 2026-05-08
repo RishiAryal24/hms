@@ -1,6 +1,7 @@
 import api from "./axios";
 
 export const getBillingSummary = () => api.get("/billing/summary/");
+export const getPatientStatement = (patientId) => api.get(`/billing/statements/${patientId}/`);
 export const getChargeItems = (params) => api.get("/billing/charges/", { params });
 export const createChargeItem = (data) => api.post("/billing/charges/", data);
 
