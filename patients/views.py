@@ -9,12 +9,14 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
+from django.db import transaction
+from django.utils import timezone
 
 from shared.permissions import IsTenantAdmin, role_required
 from .models import (
     Patient, EmergencyContact, PatientInsurance,
     MedicalHistory, Allergy, CurrentMedication,
-    AdmissionRecord, VitalSign, PatientDocument, PatientNote
+    AdmissionRecord, VitalSign, PatientDocument, PatientNote, ReferralRecord
 )
 from .serializers import (
     PatientListSerializer, PatientDetailSerializer,
@@ -22,7 +24,7 @@ from .serializers import (
     EmergencyContactSerializer, PatientInsuranceSerializer,
     MedicalHistorySerializer, AllergySerializer, CurrentMedicationSerializer,
     AdmissionRecordSerializer, VitalSignSerializer,
-    PatientDocumentSerializer, PatientNoteSerializer
+    PatientDocumentSerializer, PatientNoteSerializer, ReferralRecordSerializer
 )
 from .filters import PatientFilter
 
@@ -96,7 +98,7 @@ class PatientDetailView(generics.RetrieveAPIView):
         return Patient.objects.prefetch_related(
             'emergency_contacts', 'insurance_records', 'medical_history',
             'allergies', 'current_medications', 'admissions',
-            'vital_signs', 'documents', 'notes'
+            'vital_signs', 'documents', 'notes', 'referrals'
         ).select_related('registered_by', 'primary_doctor')
 
 
@@ -297,6 +299,60 @@ class DischargePatientView(APIView):
         if active_assignment:
             active_assignment.release()
         return Response(AdmissionRecordSerializer(admission).data)
+
+
+class ReferralRecordListCreateView(generics.ListCreateAPIView):
+    serializer_class = ReferralRecordSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [CanWriteClinical()]
+        return [CanViewPatient()]
+
+    def get_queryset(self):
+        return ReferralRecord.objects.filter(patient_id=self.kwargs['patient_pk']).select_related(
+            'patient', 'admission', 'created_by'
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['patient'] = get_object_or_404(Patient, pk=self.kwargs['patient_pk'])
+        return context
+
+    def perform_create(self, serializer):
+        patient = get_object_or_404(Patient, pk=self.kwargs['patient_pk'])
+        mark_transferred = serializer.validated_data.pop('mark_admission_transferred', False)
+        admission = serializer.validated_data.get('admission')
+
+        with transaction.atomic():
+            referral = serializer.save(
+                patient=patient,
+                created_by=self.request.user,
+                referred_at=serializer.validated_data.get('referred_at') or timezone.now(),
+            )
+            if mark_transferred and admission:
+                admission.status = 'transferred'
+                admission.discharge_date = timezone.now()
+                admission.discharge_summary = f"Transferred by referral to {referral.referred_to_facility or referral.referred_to_department or 'receiving service'}."
+                admission.save(update_fields=['status', 'discharge_date', 'discharge_summary', 'updated_at'])
+                active_assignment = admission.bed_assignments.filter(status='active').first()
+                if active_assignment:
+                    active_assignment.release()
+
+
+class ReferralRecordDetailView(generics.RetrieveUpdateAPIView):
+    serializer_class = ReferralRecordSerializer
+    permission_classes = [CanWriteClinical]
+
+    def get_queryset(self):
+        return ReferralRecord.objects.filter(patient_id=self.kwargs['patient_pk']).select_related(
+            'patient', 'admission', 'created_by'
+        )
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['patient'] = get_object_or_404(Patient, pk=self.kwargs['patient_pk'])
+        return context
 
 
 # ========================

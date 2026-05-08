@@ -22,3 +22,6 @@ export const addNote        = (pid, data)=> api.post(`/patients/${pid}/notes/`, 
 
 export const getAdmissions  = (pid)      => api.get(`/patients/${pid}/admissions/`);
 export const admitPatient   = (pid, data)=> api.post(`/patients/${pid}/admissions/`, data);
+
+export const getReferrals   = (pid)      => api.get(`/patients/${pid}/referrals/`);
+export const addReferral    = (pid, data)=> api.post(`/patients/${pid}/referrals/`, data);

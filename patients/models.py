@@ -61,6 +61,18 @@ class AdmissionStatus(models.TextChoices):
     ABSCONDED   = 'absconded',   'Absconded'
 
 
+class ReferralType(models.TextChoices):
+    INTERNAL  = 'internal',  'Internal'
+    EXTERNAL  = 'external',  'External'
+    EMERGENCY = 'emergency', 'Emergency'
+
+
+class ReferralStatus(models.TextChoices):
+    ACTIVE    = 'active',    'Active'
+    COMPLETED = 'completed', 'Completed'
+    CANCELLED = 'cancelled', 'Cancelled'
+
+
 class AllergyType(models.TextChoices):
     DRUG          = 'drug',          'Drug'
     FOOD          = 'food',          'Food'
@@ -379,6 +391,37 @@ class AdmissionRecord(TimeStampedModel):
             next_id = (last.id + 1) if last else 1
             self.admission_number = f"ADM-{next_id:06d}"
         super().save(*args, **kwargs)
+
+
+class ReferralRecord(TimeStampedModel):
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='referrals')
+    admission = models.ForeignKey(
+        AdmissionRecord,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='referrals',
+    )
+    referral_type = models.CharField(max_length=20, choices=ReferralType.choices, default=ReferralType.EXTERNAL)
+    status = models.CharField(max_length=20, choices=ReferralStatus.choices, default=ReferralStatus.ACTIVE)
+    referred_at = models.DateTimeField()
+    referred_to_facility = models.CharField(max_length=200, blank=True)
+    referred_to_department = models.CharField(max_length=120, blank=True)
+    referred_to_doctor = models.CharField(max_length=120, blank=True)
+    reason = models.TextField()
+    provisional_diagnosis = models.TextField(blank=True)
+    treatment_given = models.TextField(blank=True)
+    investigations_summary = models.TextField(blank=True)
+    current_condition = models.TextField(blank=True)
+    transport_advice = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_referrals')
+
+    class Meta:
+        ordering = ['-referred_at', '-created_at']
+
+    def __str__(self):
+        return f"Referral {self.patient.patient_id} - {self.get_referral_type_display()}"
 
 
 # ========================

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getDoctorProfiles } from "../../api/clinical";
 import { createLabOrder, getLabTests } from "../../api/lab";
+import { addReferral } from "../../api/patients";
 import {
   assignBed,
   clearBillingDischarge,
@@ -63,6 +64,23 @@ const emptyVital = {
 };
 const emptyOrder = { admission: "", order_type: "medication", priority: "routine", title: "", instructions: "" };
 const emptyLabFromOrder = { source_order: "", patient: "", admission: "", priority: "routine", clinical_notes: "", tests: [] };
+const emptyReferral = {
+  patient: "",
+  admission: "",
+  patientName: "",
+  referral_type: "external",
+  referred_to_facility: "",
+  referred_to_department: "",
+  referred_to_doctor: "",
+  reason: "",
+  provisional_diagnosis: "",
+  treatment_given: "",
+  investigations_summary: "",
+  current_condition: "",
+  transport_advice: "",
+  notes: "",
+  mark_admission_transferred: false,
+};
 const emptyDischarge = {
   admission: "",
   patientName: "",
@@ -122,6 +140,7 @@ export default function IPD() {
   const [orderModal, setOrderModal] = useState(false);
   const [labOrderModal, setLabOrderModal] = useState(false);
   const [historyModal, setHistoryModal] = useState(false);
+  const [referralModal, setReferralModal] = useState(false);
   const [dischargeModal, setDischargeModal] = useState(false);
   const [wardForm, setWardForm] = useState(emptyWard);
   const [bedForm, setBedForm] = useState(emptyBed);
@@ -131,6 +150,7 @@ export default function IPD() {
   const [vitalForm, setVitalForm] = useState(emptyVital);
   const [orderForm, setOrderForm] = useState(emptyOrder);
   const [labOrderForm, setLabOrderForm] = useState(emptyLabFromOrder);
+  const [referralForm, setReferralForm] = useState(emptyReferral);
   const [dischargeForm, setDischargeForm] = useState(emptyDischarge);
   const [roundHistory, setRoundHistory] = useState({ admission: null, doctors: [], nursing: [], vitals: [], orders: [] });
   const [saving, setSaving] = useState(false);
@@ -199,6 +219,10 @@ export default function IPD() {
       return;
     }
     setLabOrderForm((current) => ({ ...current, [event.target.name]: event.target.value }));
+  };
+  const handleReferral = (event) => {
+    const { name, value, type, checked } = event.target;
+    setReferralForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
   };
   const handleDischarge = (event) => {
     const { name, value, type, checked } = event.target;
@@ -417,6 +441,40 @@ export default function IPD() {
     }
   };
 
+  const openReferralModal = (admission) => {
+    setReferralForm({
+      ...emptyReferral,
+      patient: admission.patient,
+      admission: admission.id,
+      patientName: admission.patient_detail?.full_name || admission.admission_number,
+      provisional_diagnosis: admission.diagnosis_on_admission || "",
+      current_condition: admission.latest_vital ? `Latest vitals: BP ${admission.latest_vital.blood_pressure || "-"}, SpO2 ${admission.latest_vital.oxygen_saturation || "-"}` : "",
+      mark_admission_transferred: false,
+    });
+    setReferralModal(true);
+  };
+
+  const saveReferral = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const payload = {
+        ...referralForm,
+        referred_at: new Date().toISOString(),
+      };
+      const res = await addReferral(referralForm.patient, payload);
+      setReferralModal(false);
+      setReferralForm(emptyReferral);
+      setSuccess("Referral recorded.");
+      printReferral(res.data);
+      load();
+    } catch (err) {
+      setError(formatError(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const openDischargeModal = async (admission) => {
     setDischargeModal(true);
     setDischargeForm({
@@ -516,6 +574,7 @@ export default function IPD() {
               onVitals={openVitalModal}
               onOrder={openOrderModal}
               onHistory={openHistoryModal}
+              onReferral={openReferralModal}
               onDischarge={openDischargeModal}
             />
           )}
@@ -637,6 +696,35 @@ export default function IPD() {
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <Btn variant="secondary" onClick={() => setLabOrderModal(false)}>Cancel</Btn>
           <Btn onClick={saveLabOrderFromDoctorOrder} disabled={saving || labOrderForm.tests.length === 0}>Create Lab Order</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={referralModal} onClose={() => setReferralModal(false)} title="Refer Patient" width={720}>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ fontWeight: 800 }}>{referralForm.patientName || "Patient"}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <Field label="Referral Type" name="referral_type" value={referralForm.referral_type} onChange={handleReferral} options={[
+              { value: "internal", label: "Internal" },
+              { value: "external", label: "External" },
+              { value: "emergency", label: "Emergency" },
+            ]} />
+            <Field label="Referred To Facility" name="referred_to_facility" value={referralForm.referred_to_facility} onChange={handleReferral} />
+            <Field label="Referred To Department" name="referred_to_department" value={referralForm.referred_to_department} onChange={handleReferral} />
+            <Field label="Referred To Doctor" name="referred_to_doctor" value={referralForm.referred_to_doctor} onChange={handleReferral} />
+          </div>
+          <Field label="Reason" name="reason" value={referralForm.reason} onChange={handleReferral} required />
+          <Field label="Provisional Diagnosis" name="provisional_diagnosis" value={referralForm.provisional_diagnosis} onChange={handleReferral} />
+          <Field label="Treatment Given" name="treatment_given" value={referralForm.treatment_given} onChange={handleReferral} />
+          <Field label="Investigations Summary" name="investigations_summary" value={referralForm.investigations_summary} onChange={handleReferral} />
+          <Field label="Current Condition" name="current_condition" value={referralForm.current_condition} onChange={handleReferral} />
+          <Field label="Transport Advice" name="transport_advice" value={referralForm.transport_advice} onChange={handleReferral} />
+          <Field label="Notes" name="notes" value={referralForm.notes} onChange={handleReferral} />
+          <CheckField label="Mark this admission as transferred and release the bed" name="mark_admission_transferred" checked={referralForm.mark_admission_transferred} onChange={handleReferral} />
+          <Alert type="info" message="Saving creates a printable referral letter. Transfer-out closes the active admission as transferred." />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <Btn variant="secondary" onClick={() => setReferralModal(false)}>Cancel</Btn>
+            <Btn onClick={saveReferral} disabled={saving || !referralForm.reason}>Save Referral</Btn>
+          </div>
         </div>
       </Modal>
 
@@ -793,7 +881,7 @@ function BedsTable({ beds }) {
   );
 }
 
-function AdmissionsTable({ admissions, onDoctorRound, onNursingRound, onVitals, onOrder, onHistory, onDischarge }) {
+function AdmissionsTable({ admissions, onDoctorRound, onNursingRound, onVitals, onOrder, onHistory, onReferral, onDischarge }) {
   if (!admissions.length) return <Empty icon="IPD" message="No active admissions" />;
   return (
     <div className="table-shell" style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
@@ -815,6 +903,7 @@ function AdmissionsTable({ admissions, onDoctorRound, onNursingRound, onVitals, 
                   <Btn size="sm" variant="ghost" onClick={() => onVitals(admission)}>Vitals</Btn>
                   <Btn size="sm" variant="ghost" onClick={() => onOrder(admission)}>Order</Btn>
                   <Btn size="sm" variant="ghost" onClick={() => onHistory(admission)}>History</Btn>
+                  <Btn size="sm" variant="secondary" onClick={() => onReferral(admission)}>Refer</Btn>
                   <Btn size="sm" onClick={() => onDischarge(admission)}>Discharge</Btn>
                 </div>
               </Td>
@@ -942,6 +1031,71 @@ function OrderList({ orders, onComplete, onLabOrder }) {
       )}
     </div>
   );
+}
+
+function printReferral(referral) {
+  const patient = referral.patient_detail || {};
+  const rows = [
+    ["Referral Type", referral.referral_type],
+    ["Referred To", [referral.referred_to_facility, referral.referred_to_department, referral.referred_to_doctor].filter(Boolean).join(" / ")],
+    ["Reason", referral.reason],
+    ["Provisional Diagnosis", referral.provisional_diagnosis],
+    ["Treatment Given", referral.treatment_given],
+    ["Investigations Summary", referral.investigations_summary],
+    ["Current Condition", referral.current_condition],
+    ["Transport Advice", referral.transport_advice],
+    ["Notes", referral.notes],
+  ].filter(([, value]) => value);
+
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) return;
+  win.document.write(`
+    <html>
+      <head>
+        <title>Referral Letter</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #111827; margin: 34px; }
+          h1 { margin: 0 0 4px; font-size: 22px; }
+          .muted { color: #6b7280; font-size: 12px; }
+          .header { border-bottom: 2px solid #111827; padding-bottom: 14px; margin-bottom: 18px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 18px; }
+          .label { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+          .value { font-size: 14px; margin-top: 2px; }
+          .section { margin: 14px 0; }
+          .section-title { font-weight: 700; margin-bottom: 4px; }
+          .signature { margin-top: 50px; display: flex; justify-content: space-between; }
+          button { margin-top: 22px; padding: 8px 14px; }
+          @media print { button { display: none; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Butwal Hospital</h1>
+          <div class="muted">Patient Referral Letter</div>
+        </div>
+        <div class="grid">
+          <div><div class="label">Patient</div><div class="value">${patient.full_name || "-"}</div></div>
+          <div><div class="label">Patient ID</div><div class="value">${patient.patient_id || "-"}</div></div>
+          <div><div class="label">Age / Gender</div><div class="value">${patient.age || "-"} / ${patient.gender || "-"}</div></div>
+          <div><div class="label">Phone</div><div class="value">${patient.phone || "-"}</div></div>
+          <div><div class="label">Admission</div><div class="value">${referral.admission_number || "-"}</div></div>
+          <div><div class="label">Date</div><div class="value">${new Date(referral.referred_at).toLocaleString()}</div></div>
+        </div>
+        ${rows.map(([label, value]) => `
+          <div class="section">
+            <div class="section-title">${label}</div>
+            <div>${value}</div>
+          </div>
+        `).join("")}
+        <div class="signature">
+          <div>Prepared by: ${referral.created_by_name || "-"}</div>
+          <div>Doctor Signature: __________________</div>
+        </div>
+        <button onclick="window.print()">Print</button>
+      </body>
+    </html>
+  `);
+  win.document.close();
 }
 
 function Th({ children }) {

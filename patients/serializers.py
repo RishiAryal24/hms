@@ -7,7 +7,7 @@ from rest_framework import serializers
 from .models import (
     Patient, EmergencyContact, PatientInsurance,
     MedicalHistory, Allergy, CurrentMedication,
-    AdmissionRecord, VitalSign, PatientDocument, PatientNote
+    AdmissionRecord, VitalSign, PatientDocument, PatientNote, ReferralRecord
 )
 
 
@@ -90,6 +90,46 @@ class AdmissionRecordSerializer(serializers.ModelSerializer):
         read_only_fields = ['patient', 'admission_number', 'admitted_by', 'created_at', 'updated_at']
 
 
+class ReferralRecordSerializer(serializers.ModelSerializer):
+    patient_detail = serializers.SerializerMethodField()
+    admission_number = serializers.CharField(source='admission.admission_number', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    mark_admission_transferred = serializers.BooleanField(write_only=True, required=False, default=False)
+
+    class Meta:
+        model = ReferralRecord
+        fields = '__all__'
+        read_only_fields = ['patient', 'created_by', 'created_at', 'updated_at']
+        extra_kwargs = {'referred_at': {'required': False}}
+
+    def get_patient_detail(self, obj):
+        return {
+            'id': obj.patient_id,
+            'patient_id': obj.patient.patient_id,
+            'full_name': obj.patient.get_full_name(),
+            'phone': obj.patient.phone,
+            'age': obj.patient.age,
+            'gender': obj.patient.gender,
+        }
+
+    def validate(self, attrs):
+        admission = attrs.get('admission')
+        patient = self.context.get('patient')
+        mark_transferred = attrs.get('mark_admission_transferred', False)
+
+        if admission and patient and admission.patient_id != patient.id:
+            raise serializers.ValidationError({'admission': 'Admission does not belong to this patient.'})
+        if mark_transferred and not admission:
+            raise serializers.ValidationError({'admission': 'Admission is required when marking referral as transferred.'})
+        if mark_transferred and admission and admission.status != 'admitted':
+            raise serializers.ValidationError({'admission': 'Only active admissions can be marked as transferred.'})
+        return attrs
+
+    def update(self, instance, validated_data):
+        validated_data.pop('mark_admission_transferred', None)
+        return super().update(instance, validated_data)
+
+
 # -----------------------------------------------------------------------
 # Patient — List  (lightweight)
 # -----------------------------------------------------------------------
@@ -126,6 +166,7 @@ class PatientDetailSerializer(serializers.ModelSerializer):
     vital_signs         = VitalSignSerializer(many=True, read_only=True)
     documents           = PatientDocumentSerializer(many=True, read_only=True)
     notes               = serializers.SerializerMethodField()
+    referrals           = ReferralRecordSerializer(many=True, read_only=True)
     registered_by_name  = serializers.CharField(source='registered_by.get_full_name', read_only=True)
     primary_doctor_name = serializers.CharField(source='primary_doctor.get_full_name', read_only=True)
 

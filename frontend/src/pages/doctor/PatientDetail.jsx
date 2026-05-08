@@ -6,7 +6,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   getPatient, getVitals, addVital, getAllergies, addAllergy,
   getMedications, addMedication, getNotes, addNote,
-  getAdmissions, admitPatient,
+  getAdmissions, admitPatient, getReferrals, addReferral,
 } from "../../api/patients";
 import { Badge, Btn, Modal, Field, Spinner, Empty, Alert, Card, Tabs, InfoRow } from "../../components/ui";
 
@@ -18,6 +18,8 @@ const SEVERITY_OPTS  = [{value:"mild",label:"Mild"},{value:"moderate",label:"Mod
 const ROUTE_OPTS     = [{value:"oral",label:"Oral"},{value:"intravenous",label:"Intravenous"},{value:"intramuscular",label:"Intramuscular"},{value:"subcutaneous",label:"Subcutaneous"},{value:"topical",label:"Topical"},{value:"inhalation",label:"Inhalation"},{value:"other",label:"Other"}];
 const NOTE_TYPES     = [{value:"clinical",label:"Clinical"},{value:"nursing",label:"Nursing"},{value:"administrative",label:"Administrative"},{value:"follow_up",label:"Follow Up"},{value:"discharge",label:"Discharge"}];
 const ADMISSION_TYPES= [{value:"outpatient",label:"Outpatient (OPD)"},{value:"inpatient",label:"Inpatient (IPD)"},{value:"emergency",label:"Emergency"},{value:"day_care",label:"Day Care"}];
+const REFERRAL_TYPES = [{value:"internal",label:"Internal"},{value:"external",label:"External"},{value:"emergency",label:"Emergency"}];
+const emptyReferral  = { admission:"", referral_type:"external", referred_to_facility:"", referred_to_department:"", referred_to_doctor:"", reason:"", provisional_diagnosis:"", treatment_given:"", investigations_summary:"", current_condition:"", transport_advice:"", notes:"", mark_admission_transferred:false };
 
 export default function PatientDetail() {
   const { id }   = useParams();
@@ -29,6 +31,7 @@ export default function PatientDetail() {
   const [medications, setMeds]        = useState([]);
   const [notes,       setNotes]       = useState([]);
   const [admissions,  setAdmissions]  = useState([]);
+  const [referrals,   setReferrals]   = useState([]);
   const [tab,         setTab]         = useState("overview");
   const [loading,     setLoading]     = useState(true);
 
@@ -38,6 +41,7 @@ export default function PatientDetail() {
   const [medModal,     setMedModal]     = useState(false);
   const [noteModal,    setNoteModal]    = useState(false);
   const [admitModal,   setAdmitModal]   = useState(false);
+  const [referralModal,setReferralModal]= useState(false);
   const [saving,       setSaving]       = useState(false);
   const [error,        setError]        = useState("");
 
@@ -47,6 +51,7 @@ export default function PatientDetail() {
   const [medForm,    setMedForm]    = useState({ medication_name:"", dosage:"", frequency:"", route:"oral", prescribed_by:"", start_date:"", end_date:"", is_ongoing:true, notes:"" });
   const [noteForm,   setNoteForm]   = useState({ note_type:"clinical", content:"", is_confidential:false });
   const [admitForm,  setAdmitForm]  = useState({ admission_type:"inpatient", admission_date:"", admission_time:"", chief_complaint:"", ward:"", bed_number:"", department:"" });
+  const [referralForm,setReferralForm]= useState(emptyReferral);
 
   const loadAll = () => {
     setLoading(true);
@@ -57,13 +62,15 @@ export default function PatientDetail() {
       getMedications(id),
       getNotes(id),
       getAdmissions(id),
-    ]).then(([p, v, al, m, n, ad]) => {
+      getReferrals(id),
+    ]).then(([p, v, al, m, n, ad, r]) => {
       setPatient(p.data);
       setVitals(v.data.results      || v.data);
       setAllergies(al.data.results  || al.data);
       setMeds(m.data.results        || m.data);
       setNotes(n.data.results       || n.data);
       setAdmissions(ad.data.results || ad.data);
+      setReferrals(r.data.results   || r.data);
     }).finally(() => setLoading(false));
   };
 
@@ -103,6 +110,30 @@ export default function PatientDetail() {
     } finally { setSaving(false); }
   };
 
+  const openReferralModal = () => {
+    setError("");
+    setReferralForm({
+      ...emptyReferral,
+      admission: activeAdmission?.id || "",
+      provisional_diagnosis: activeAdmission?.diagnosis_on_admission || "",
+    });
+    setReferralModal(true);
+  };
+
+  const saveReferral = async () => {
+    setSaving(true); setError("");
+    try {
+      const res = await addReferral(id, { ...referralForm, referred_at: new Date().toISOString() });
+      setReferralModal(false);
+      setReferralForm(emptyReferral);
+      printReferralLetter(res.data);
+      loadAll();
+    } catch (err) {
+      const d = err.response?.data;
+      setError(typeof d === "object" ? Object.values(d).flat().join(" ") : "Referral failed.");
+    } finally { setSaving(false); }
+  };
+
   const TABS = [
     { key: "overview",    label: "Overview" },
     { key: "vitals",      label: `Vitals (${vitals.length})` },
@@ -110,6 +141,7 @@ export default function PatientDetail() {
     { key: "medications", label: `Medications (${medications.length})` },
     { key: "notes",       label: `Notes (${notes.length})` },
     { key: "admissions",  label: `Admissions (${admissions.length})` },
+    { key: "referrals",   label: `Referrals (${referrals.length})` },
   ];
 
   if (loading) return <div style={{ padding: 40, textAlign: "center" }}><Spinner size={36} /></div>;
@@ -156,6 +188,7 @@ export default function PatientDetail() {
               <Btn size="sm" variant="ghost" onClick={() => { setError(""); setAllergyModal(true); }}>+ Allergy</Btn>
               <Btn size="sm" variant="ghost" onClick={() => { setError(""); setMedModal(true); }}>+ Medication</Btn>
               <Btn size="sm" variant="ghost" onClick={() => { setError(""); setNoteModal(true); }}>+ Note</Btn>
+              <Btn size="sm" variant="secondary" onClick={openReferralModal}>Refer Patient</Btn>
               {!activeAdmission && (
                 <Btn size="sm" onClick={() => { setError(""); setAdmitModal(true); }}>Admit Patient</Btn>
               )}
@@ -213,6 +246,32 @@ export default function PatientDetail() {
               </div>
             </Card>
           )}
+        </div>
+      )}
+
+      {tab === "referrals" && (
+        <div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+            <Btn size="sm" onClick={openReferralModal}>+ New Referral</Btn>
+          </div>
+          {referrals.length === 0 ? <Empty icon="RF" message="No referrals recorded" /> :
+            referrals.map(r => (
+              <div key={r.id} style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px 20px", marginBottom: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{r.referred_to_facility || r.referred_to_department || "Referral"}</div>
+                    <div style={{ color: "var(--text-mute)", fontSize: 12, marginTop: 4 }}>{new Date(r.referred_at).toLocaleString()}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Badge label={r.referral_type} color="var(--blue)" />
+                    <Badge label={r.status} color={r.status === "active" ? "var(--green)" : "var(--text-mute)"} />
+                    <Btn size="sm" variant="secondary" onClick={() => printReferralLetter(r)}>Print</Btn>
+                  </div>
+                </div>
+                <div style={{ color: "var(--text-mute)", fontSize: 13, marginTop: 10 }}>{r.reason}</div>
+              </div>
+            ))
+          }
         </div>
       )}
 
@@ -489,6 +548,79 @@ export default function PatientDetail() {
         </div>
       </Modal>
 
+      <Modal open={referralModal} onClose={() => setReferralModal(false)} title="Refer Patient" width={680}>
+        {error && <Alert message={error} />}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+          <Field label="Referral Type" name="referral_type" value={referralForm.referral_type} onChange={handle(setReferralForm)} options={REFERRAL_TYPES} />
+          <Field label="Facility" name="referred_to_facility" value={referralForm.referred_to_facility} onChange={handle(setReferralForm)} />
+          <Field label="Department" name="referred_to_department" value={referralForm.referred_to_department} onChange={handle(setReferralForm)} />
+          <Field label="Doctor" name="referred_to_doctor" value={referralForm.referred_to_doctor} onChange={handle(setReferralForm)} />
+          <div style={{ gridColumn: "span 2" }}><Field label="Reason" name="reason" value={referralForm.reason} onChange={handle(setReferralForm)} required /></div>
+          <div style={{ gridColumn: "span 2" }}><Field label="Provisional Diagnosis" name="provisional_diagnosis" value={referralForm.provisional_diagnosis} onChange={handle(setReferralForm)} /></div>
+          <div style={{ gridColumn: "span 2" }}><Field label="Treatment Given" name="treatment_given" value={referralForm.treatment_given} onChange={handle(setReferralForm)} /></div>
+          <div style={{ gridColumn: "span 2" }}><Field label="Investigations Summary" name="investigations_summary" value={referralForm.investigations_summary} onChange={handle(setReferralForm)} /></div>
+          <div style={{ gridColumn: "span 2" }}><Field label="Current Condition" name="current_condition" value={referralForm.current_condition} onChange={handle(setReferralForm)} /></div>
+          <div style={{ gridColumn: "span 2" }}><Field label="Transport Advice" name="transport_advice" value={referralForm.transport_advice} onChange={handle(setReferralForm)} /></div>
+          <div style={{ gridColumn: "span 2" }}><Field label="Notes" name="notes" value={referralForm.notes} onChange={handle(setReferralForm)} /></div>
+          {activeAdmission && (
+            <label style={{ gridColumn: "span 2", display: "flex", alignItems: "center", gap: 8, marginBottom: 16, color: "var(--text-mute)", fontSize: 13 }}>
+              <input type="checkbox" name="mark_admission_transferred" checked={referralForm.mark_admission_transferred} onChange={handle(setReferralForm)} />
+              Mark active admission as transferred and release bed
+            </label>
+          )}
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 16, borderTop: "1px solid var(--border-light)" }}>
+          <Btn variant="secondary" onClick={() => setReferralModal(false)}>Cancel</Btn>
+          <Btn onClick={saveReferral} disabled={saving || !referralForm.reason}>{saving ? "Saving..." : "Save Referral"}</Btn>
+        </div>
+      </Modal>
+
     </div>
   );
+}
+
+function printReferralLetter(referral) {
+  const patient = referral.patient_detail || {};
+  const rows = [
+    ["Referral Type", referral.referral_type],
+    ["Referred To", [referral.referred_to_facility, referral.referred_to_department, referral.referred_to_doctor].filter(Boolean).join(" / ")],
+    ["Reason", referral.reason],
+    ["Provisional Diagnosis", referral.provisional_diagnosis],
+    ["Treatment Given", referral.treatment_given],
+    ["Investigations Summary", referral.investigations_summary],
+    ["Current Condition", referral.current_condition],
+    ["Transport Advice", referral.transport_advice],
+    ["Notes", referral.notes],
+  ].filter(([, value]) => value);
+  const win = window.open("", "_blank", "width=900,height=700");
+  if (!win) return;
+  win.document.write(`
+    <html><head><title>Referral Letter</title><style>
+      body { font-family: Arial, sans-serif; color: #111827; margin: 34px; }
+      h1 { margin: 0 0 4px; font-size: 22px; }
+      .muted { color: #6b7280; font-size: 12px; }
+      .header { border-bottom: 2px solid #111827; padding-bottom: 14px; margin-bottom: 18px; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 18px; }
+      .label { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+      .section { margin: 14px 0; }
+      .section-title { font-weight: 700; margin-bottom: 4px; }
+      .signature { margin-top: 50px; display: flex; justify-content: space-between; }
+      button { margin-top: 22px; padding: 8px 14px; }
+      @media print { button { display: none; } }
+    </style></head><body>
+      <div class="header"><h1>Butwal Hospital</h1><div class="muted">Patient Referral Letter</div></div>
+      <div class="grid">
+        <div><div class="label">Patient</div><div>${patient.full_name || "-"}</div></div>
+        <div><div class="label">Patient ID</div><div>${patient.patient_id || "-"}</div></div>
+        <div><div class="label">Age / Gender</div><div>${patient.age || "-"} / ${patient.gender || "-"}</div></div>
+        <div><div class="label">Phone</div><div>${patient.phone || "-"}</div></div>
+        <div><div class="label">Admission</div><div>${referral.admission_number || "-"}</div></div>
+        <div><div class="label">Date</div><div>${new Date(referral.referred_at).toLocaleString()}</div></div>
+      </div>
+      ${rows.map(([label, value]) => `<div class="section"><div class="section-title">${label}</div><div>${value}</div></div>`).join("")}
+      <div class="signature"><div>Prepared by: ${referral.created_by_name || "-"}</div><div>Doctor Signature: __________________</div></div>
+      <button onclick="window.print()">Print</button>
+    </body></html>
+  `);
+  win.document.close();
 }

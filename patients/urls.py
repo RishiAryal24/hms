@@ -54,6 +54,12 @@ urlpatterns = [
     path('<int:patient_pk>/admissions/<int:pk>/discharge/',
          views.DischargePatientView.as_view(),    name='discharge-patient'),
 
+    # Referrals
+    path('<int:patient_pk>/referrals/',
+         views.ReferralRecordListCreateView.as_view(), name='referral-list'),
+    path('<int:patient_pk>/referrals/<int:pk>/',
+         views.ReferralRecordDetailView.as_view(),     name='referral-detail'),
+
     # Vital Signs  (Nurses + Doctors record / all staff view)
     path('<int:patient_pk>/vitals/',
          views.VitalSignListCreateView.as_view(), name='vital-list'),

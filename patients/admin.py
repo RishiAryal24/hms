@@ -10,7 +10,7 @@ from accounts.models import User
 from .models import (
     Patient, EmergencyContact, PatientInsurance,
     MedicalHistory, Allergy, CurrentMedication,
-    AdmissionRecord, VitalSign, PatientDocument, PatientNote
+    AdmissionRecord, VitalSign, PatientDocument, PatientNote, ReferralRecord
 )
 
 
@@ -132,3 +132,11 @@ admin.site.register(Allergy)
 admin.site.register(CurrentMedication)
 admin.site.register(PatientDocument)
 admin.site.register(PatientNote)
+
+
+@admin.register(ReferralRecord)
+class ReferralRecordAdmin(admin.ModelAdmin):
+    list_display = ['patient', 'admission', 'referral_type', 'status', 'referred_to_facility', 'referred_at', 'created_by']
+    list_filter = ['referral_type', 'status', 'referred_at']
+    search_fields = ['patient__patient_id', 'patient__first_name', 'patient__last_name', 'referred_to_facility', 'reason']
+    readonly_fields = ['created_at', 'updated_at']
